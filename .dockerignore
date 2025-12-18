@@ -1,0 +1,47 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.coverage
+.pytest_cache
+.mypy_cache
+
+# Arquivos de download temporários
+downloads/*
+!downloads/.gitkeep
+*.zip
+*.mp3
+temp_*.spotdl
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de teste
+test_download/
+test_*.py
+
+# Documentação local
+*.md
+!README.md
+
+# Arquivos de configuração local
+.env
+.env.local
+config_local.py
