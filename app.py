@@ -265,15 +265,24 @@ def index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Playlist Downloader</title>
+    <title>SpotShadow - Spotify Playlist Downloader</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(to bottom, #08a901, #053912); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: white; }
         .container { background: linear-gradient(to bottom, rgba(8, 169, 1, 0.3), rgba(5, 57, 18, 0.3)); backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); max-width: 500px; width: 90%; text-align: center; }
+        .logo { margin-bottom: 10px; }
+        .logo img { border-radius: 10px; transition: transform 0.3s ease; }
+        .logo img:hover { transform: scale(1.05); }
         h1 { margin-bottom: 30px; font-size: 1.8em; font-weight: 300; }
         input[type="url"] { width: 100%; padding: 15px; border: none; border-radius: 10px; background: rgba(255, 255, 255, 0.9); color: #333; font-size: 16px; outline: none; margin-bottom: 20px; }
         .btn { background: #1db954; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 20px; }
-        .btn:hover { background: #1ed760; }
+        .btn:hover { background: #1ed760; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(29, 185, 84, 0.4); }
+        .btn:disabled { background: #666; cursor: not-allowed; transform: none; box-shadow: none; }
+        input[type="url"]:focus { background: white; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); }
+        .status.downloading { background: rgba(29, 185, 84, 0.2); border: 1px solid #1db954; }
+        .status.completed { background: rgba(76, 175, 80, 0.2); border: 1px solid #4caf50; }
+        .status.error { background: rgba(244, 67, 54, 0.2); border: 1px solid #f44336; }
         .status { margin-top: 20px; padding: 15px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); display: none; }
         .status.show { display: block; }
         .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-top: 3px solid #1db954; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; }
@@ -282,6 +291,9 @@ def index():
 </head>
 <body>
     <div class="container">
+        <div class="logo">
+            <img src="/logotipo-semfundo.png" alt="SpotShadow Logo" style="max-width: 150px; max-height: 150px; margin-bottom: 20px;" onerror="this.style.display='none'">
+        </div>
         <h1>🎵 Spotify Playlist Downloader</h1>
         <form id="downloadForm">
             <input type="url" id="playlistUrl" placeholder="Cole aqui o link da playlist do Spotify..." required>
@@ -310,7 +322,7 @@ def index():
 
             downloadBtn.disabled = true;
             downloadBtn.textContent = 'Processando...';
-            status.className = 'status show';
+            status.className = 'status show downloading';
             spinner.style.display = 'block';
             progressText.textContent = 'Iniciando download...';
             downloadZipBtn.style.display = 'none';
@@ -336,6 +348,7 @@ def index():
 
                         if (statusData.status === 'completed') {
                             clearInterval(statusInterval);
+                            status.className = 'status show completed';
                             spinner.style.display = 'none';
                             progressText.textContent = '✅ Download concluído!';
                             downloadZipBtn.style.display = 'block';
@@ -343,6 +356,7 @@ def index():
                             downloadBtn.textContent = 'Baixar Playlist';
                         } else if (statusData.status === 'error') {
                             clearInterval(statusInterval);
+                            status.className = 'status show error';
                             spinner.style.display = 'none';
                             progressText.textContent = '❌ ' + (statusData.error_message || 'Erro desconhecido');
                             downloadBtn.disabled = false;
@@ -358,6 +372,7 @@ def index():
                 }, 1000);
 
             } catch (error) {
+                status.className = 'status show error';
                 spinner.style.display = 'none';
                 progressText.textContent = '❌ ' + error.message;
                 downloadBtn.disabled = false;
