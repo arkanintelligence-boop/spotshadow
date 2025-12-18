@@ -37,11 +37,21 @@ Thumbs.db
 test_download/
 test_*.py
 
-# Documentação local
-*.md
+# Documentação local (manter apenas essenciais)
+DEPLOY_*.md
+COMANDOS_*.md
+CORRECOES_*.md
+OPCOES_*.md
 !README.md
 
 # Arquivos de configuração local
 .env
 .env.local
 config_local.py
+
+# Manter arquivos essenciais
+!favicon.png
+!logotipo-semfundo.png
+!templates/
+!app.py
+!requirements.txt

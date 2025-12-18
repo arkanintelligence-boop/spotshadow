@@ -14,17 +14,16 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar arquivos essenciais primeiro
-COPY app.py .
-COPY templates/ ./templates/
-COPY favicon.png .
-COPY logotipo-semfundo.png .
+# Copiar todo o código da aplicação
+COPY . .
 
 # Criar pastas necessárias
 RUN mkdir -p downloads
 
-# Verificar se templates foi copiado corretamente
-RUN ls -la templates/ && echo "Templates directory OK"
+# Verificar se arquivos essenciais existem
+RUN ls -la templates/ || echo "Templates directory missing"
+RUN ls -la favicon.png || echo "Favicon missing"
+RUN ls -la logotipo-semfundo.png || echo "Logo missing"
 
 # Definir variáveis de ambiente
 ENV PYTHONUNBUFFERED=1
