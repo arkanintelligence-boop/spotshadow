@@ -14,11 +14,17 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código da aplicação
-COPY . .
+# Copiar arquivos essenciais primeiro
+COPY app.py .
+COPY templates/ ./templates/
+COPY favicon.png .
+COPY logotipo-semfundo.png .
 
-# Criar pasta downloads
-RUN mkdir -p downloads templates
+# Criar pastas necessárias
+RUN mkdir -p downloads
+
+# Verificar se templates foi copiado corretamente
+RUN ls -la templates/ && echo "Templates directory OK"
 
 # Definir variáveis de ambiente
 ENV PYTHONUNBUFFERED=1
@@ -30,7 +36,7 @@ EXPOSE 5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+    CMD curl -f http://localhost:5000/health || exit 1
 
 # Comando de inicialização mais robusto
 CMD ["python", "-u", "app.py"]

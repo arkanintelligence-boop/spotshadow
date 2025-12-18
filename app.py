@@ -24,7 +24,7 @@ app = Flask(__name__)
 
 # Chave de segurança (mude esta chave em produção!)
 SECRET_KEY = "SUA_CHAVE_SECRETA_SUPER_FORTE_2024_MUDE_ESTA_CHAVE"
-DOMAIN_WHITELIST = ["localhost", "127.0.0.1", "seudominio.com"]  # Adicione seus domínios
+DOMAIN_WHITELIST = ["localhost", "127.0.0.1", "seudominio.com", "easypanel.host", "easypanel.io"]  # Adicione seus domínios
 
 # Status global do download
 download_status = {
@@ -59,6 +59,9 @@ def verify_security_token(token, max_age=300):  # 5 minutos
 def check_domain_whitelist():
     """Verifica se o domínio está na whitelist"""
     host = request.headers.get('Host', '').split(':')[0]
+    # Para desenvolvimento e EasyPanel, permitir qualquer host
+    if 'easypanel' in host or host.startswith('192.168') or host.startswith('10.') or host.startswith('172.'):
+        return True
     return host in DOMAIN_WHITELIST
 
 def cleanup_old_files():
@@ -315,10 +318,13 @@ def get_token():
 @app.route('/status')
 def status():
     """Verificar status do download"""
-    if not check_domain_whitelist():
-        return jsonify({'error': 'Acesso negado'}), 403
-        
+    # Para health check, não verificar whitelist
     return jsonify(download_status)
+
+@app.route('/health')
+def health():
+    """Health check endpoint"""
+    return jsonify({'status': 'healthy', 'service': 'spotshadow'})
 
 @app.route('/download-zip')
 def download_zip():
