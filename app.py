@@ -362,9 +362,14 @@ if __name__ == '__main__':
     # Iniciar limpeza automática
     schedule_cleanup()
     
+    # Configuração para produção
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    
     print("🎵 Spotify Playlist Downloader")
     print("🔒 Sistema de segurança ativado")
     print("🗑️ Limpeza automática ativada (5 minutos)")
-    print("🌐 Servidor iniciando em http://localhost:5000")
+    print(f"🌐 Servidor iniciando na porta {port}")
+    print(f"🔧 Modo debug: {debug}")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug, host='0.0.0.0', port=port)
