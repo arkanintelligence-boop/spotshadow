@@ -24,7 +24,7 @@ app = Flask(__name__)
 
 # Chave de segurança (mude esta chave em produção!)
 SECRET_KEY = "SUA_CHAVE_SECRETA_SUPER_FORTE_2024_MUDE_ESTA_CHAVE"
-DOMAIN_WHITELIST = ["localhost", "127.0.0.1", "seudominio.com", "easypanel.host", "easypanel.io"]  # Adicione seus domínios
+DOMAIN_WHITELIST = ["localhost", "127.0.0.1", "seudominio.com", "railway.app", "up.railway.app"]  # Adicione seus domínios
 
 # Status global do download
 download_status = {
@@ -59,8 +59,9 @@ def verify_security_token(token, max_age=300):  # 5 minutos
 def check_domain_whitelist():
     """Verifica se o domínio está na whitelist"""
     host = request.headers.get('Host', '').split(':')[0]
-    # Para desenvolvimento e EasyPanel, permitir qualquer host
-    if 'easypanel' in host or host.startswith('192.168') or host.startswith('10.') or host.startswith('172.'):
+    # Para desenvolvimento, Railway e EasyPanel, permitir qualquer host
+    if ('railway.app' in host or 'easypanel' in host or 
+        host.startswith('192.168') or host.startswith('10.') or host.startswith('172.')):
         return True
     return host in DOMAIN_WHITELIST
 
@@ -371,11 +372,18 @@ if __name__ == '__main__':
     # Configuração para produção
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    host = os.environ.get('HOST', '0.0.0.0')
     
     print("🎵 Spotify Playlist Downloader")
     print("🔒 Sistema de segurança ativado")
     print("🗑️ Limpeza automática ativada (5 minutos)")
     print(f"🌐 Servidor iniciando na porta {port}")
     print(f"🔧 Modo debug: {debug}")
+    print(f"🏠 Host: {host}")
     
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    try:
+        app.run(debug=debug, host=host, port=port)
+    except Exception as e:
+        print(f"❌ Erro ao iniciar servidor: {e}")
+        import traceback
+        traceback.print_exc()
