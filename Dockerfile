@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 
-# Instalar dependências do sistema necessárias
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
@@ -10,27 +10,27 @@ RUN apt-get update && apt-get install -y \
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar requirements primeiro (para melhor cache do Docker)
+# Copiar requirements e instalar dependências
 COPY requirements.txt .
-
-# Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar todo o código da aplicação
+# Copiar código da aplicação
 COPY . .
 
-# Criar pasta downloads com permissões corretas
-RUN mkdir -p downloads && chmod 755 downloads
+# Criar pasta downloads
+RUN mkdir -p downloads templates
 
-# Criar pasta templates se não existir
-RUN mkdir -p templates
-
-# Expor a porta que a aplicação vai usar
-EXPOSE 5000
-
-# Definir variáveis de ambiente padrão
+# Definir variáveis de ambiente
 ENV PYTHONUNBUFFERED=1
 ENV PORT=5000
+ENV HOST=0.0.0.0
 
-# Comando para iniciar a aplicação
-CMD ["python", "app.py"]
+# Expor porta
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/ || exit 1
+
+# Comando de inicialização mais robusto
+CMD ["python", "-u", "app.py"]
