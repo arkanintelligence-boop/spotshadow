@@ -254,7 +254,124 @@ def download_playlist_async(playlist_url):
 @app.route('/')
 def index():
     """Página principal"""
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        # Fallback: HTML inline se template não for encontrado
+        print(f"⚠️ Template não encontrado: {e}")
+        return """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Playlist Downloader</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(to bottom, #08a901, #053912); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: white; }
+        .container { background: linear-gradient(to bottom, rgba(8, 169, 1, 0.3), rgba(5, 57, 18, 0.3)); backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); max-width: 500px; width: 90%; text-align: center; }
+        h1 { margin-bottom: 30px; font-size: 1.8em; font-weight: 300; }
+        input[type="url"] { width: 100%; padding: 15px; border: none; border-radius: 10px; background: rgba(255, 255, 255, 0.9); color: #333; font-size: 16px; outline: none; margin-bottom: 20px; }
+        .btn { background: #1db954; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 20px; }
+        .btn:hover { background: #1ed760; }
+        .status { margin-top: 20px; padding: 15px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); display: none; }
+        .status.show { display: block; }
+        .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-top: 3px solid #1db954; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Spotify Playlist Downloader</h1>
+        <form id="downloadForm">
+            <input type="url" id="playlistUrl" placeholder="Cole aqui o link da playlist do Spotify..." required>
+            <button type="submit" class="btn" id="downloadBtn">Baixar Playlist</button>
+        </form>
+        <div id="status" class="status">
+            <div id="spinner" class="spinner" style="display: none;"></div>
+            <div id="progressText"></div>
+            <button id="downloadZipBtn" class="btn" style="display: none;">📦 Baixar ZIP</button>
+        </div>
+        <p><strong>Exemplo:</strong> https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</p>
+    </div>
+    <script>
+        const form = document.getElementById('downloadForm');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const status = document.getElementById('status');
+        const spinner = document.getElementById('spinner');
+        const progressText = document.getElementById('progressText');
+        const downloadZipBtn = document.getElementById('downloadZipBtn');
+        const playlistUrl = document.getElementById('playlistUrl');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = playlistUrl.value.trim();
+            if (!url) return;
+
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Processando...';
+            status.className = 'status show';
+            spinner.style.display = 'block';
+            progressText.textContent = 'Iniciando download...';
+            downloadZipBtn.style.display = 'none';
+
+            try {
+                const tokenResponse = await fetch('/get-token');
+                const tokenData = await tokenResponse.json();
+                
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url, token: tokenData.token })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Erro no servidor');
+
+                const statusInterval = setInterval(async () => {
+                    try {
+                        const statusResponse = await fetch('/status');
+                        const statusData = await statusResponse.json();
+                        progressText.textContent = statusData.progress || 'Processando...';
+
+                        if (statusData.status === 'completed') {
+                            clearInterval(statusInterval);
+                            spinner.style.display = 'none';
+                            progressText.textContent = '✅ Download concluído!';
+                            downloadZipBtn.style.display = 'block';
+                            downloadBtn.disabled = false;
+                            downloadBtn.textContent = 'Baixar Playlist';
+                        } else if (statusData.status === 'error') {
+                            clearInterval(statusInterval);
+                            spinner.style.display = 'none';
+                            progressText.textContent = '❌ ' + (statusData.error_message || 'Erro desconhecido');
+                            downloadBtn.disabled = false;
+                            downloadBtn.textContent = 'Baixar Playlist';
+                        }
+                    } catch (error) {
+                        clearInterval(statusInterval);
+                        spinner.style.display = 'none';
+                        progressText.textContent = '❌ Erro ao verificar status';
+                        downloadBtn.disabled = false;
+                        downloadBtn.textContent = 'Baixar Playlist';
+                    }
+                }, 1000);
+
+            } catch (error) {
+                spinner.style.display = 'none';
+                progressText.textContent = '❌ ' + error.message;
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Baixar Playlist';
+            }
+        });
+
+        downloadZipBtn.addEventListener('click', () => {
+            window.location.href = '/download-zip';
+        });
+    </script>
+</body>
+</html>
+        """
 
 @app.route('/download', methods=['POST'])
 def download():
