@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Playlist Downloader</title>
+    <link rel="icon" type="image/png" href="images/favicon.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/security.css">
+    
+    <!-- Proteções Meta -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="no-referrer">
+</head>
+<body class="screenshot-protection">
+    <div class="container no-inspect">
+        <div class="logo">
+            <img src="images/logotipo-semfundo.png" alt="Logo" />
+        </div>
+        <h1>Spotify Playlist Downloader</h1>
+        
+        <form id="downloadForm">
+            <div class="input-group">
+                <input 
+                    type="url" 
+                    id="playlistUrl" 
+                    placeholder="Cole aqui o link da playlist do Spotify..."
+                    required
+                >
+            </div>
+            
+            <button type="submit" class="btn" id="downloadBtn">
+                Baixar Playlist
+            </button>
+        </form>
+
+        <div id="status" class="status">
+            <div id="spinner" class="spinner" style="display: none;"></div>
+            <div id="progressText" class="progress"></div>
+            <button id="downloadZipBtn" class="btn download-btn" style="display: none;">
+                📦 Baixar ZIP
+            </button>
+        </div>
+
+        <div class="example">
+            <strong>Exemplo:</strong><br>
+            <code>https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</code>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="js/script.js"></script>
+</body>
+</html>

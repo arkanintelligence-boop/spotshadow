@@ -1,0 +1,4 @@
+spotdl
+flask
+schedule
+cryptography

@@ -1,0 +1,19 @@
+# Manter apenas arquivos essenciais
+# Ignorar tudo na raiz exceto public/ e alguns arquivos específicos
+/*
+
+# Permitir apenas estes arquivos/pastas
+!public/
+!app.py
+!requirements.txt
+!README.md
+!.gitignore
+
+# Arquivos temporários e downloads
+downloads/
+*.zip
+*.mp3
+temp_*.spotdl
+__pycache__/
+*.pyc
+.env
