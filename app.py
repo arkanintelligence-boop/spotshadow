@@ -56,8 +56,17 @@ def download_playlist_async(playlist_url):
         
         download_status['progress'] = 'Baixando músicas...'
         
-        # Comando spotDL simples
-        cmd = ['spotdl', 'download', playlist_url, '--output', output_dir]
+        # Aguardar um pouco para evitar rate limit
+        import time
+        time.sleep(5)
+        
+        # Comando spotDL com configurações para evitar rate limit
+        cmd = [
+            'spotdl', 
+            playlist_url, 
+            '--output', output_dir,
+            '--threads', '1'  # Usar apenas 1 thread para ser mais "gentil"
+        ]
         
         # Executar download
         process = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
