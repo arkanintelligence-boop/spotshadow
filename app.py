@@ -107,21 +107,48 @@ def get_playlist_info_public(playlist_url):
                                 title = matches[0] if matches else 'Playlist'
                                 print(f"🎵 Título encontrado: {title}")
                                 
-                                # Retornar músicas de exemplo para teste
+                                # Tentar extrair músicas da página
+                                print("🔍 Tentando extrair músicas da página...")
+                                
+                                # Buscar padrões de música no conteúdo
+                                song_patterns = [
+                                    r'"name":"([^"]+)"[^}]*"artists":\[{"name":"([^"]+)"',
+                                    r'"track":{"name":"([^"]+)".*?"artists":\[{"name":"([^"]+)"'
+                                ]
+                                
+                                extracted_songs = []
+                                for pattern in song_patterns:
+                                    matches = re.findall(pattern, content)
+                                    for match in matches:
+                                        if len(match) == 2:
+                                            song_title = f"{match[1]} - {match[0]}"
+                                            if song_title not in extracted_songs and len(song_title) > 5:
+                                                extracted_songs.append(song_title)
+                                
+                                if extracted_songs:
+                                    print(f"✅ Extraídas {len(extracted_songs)} músicas")
+                                    return extracted_songs[:15]  # Limitar a 15 músicas
+                                
+                                # Fallback para músicas de exemplo apenas se não conseguir extrair
+                                print("⚠️ Usando músicas de exemplo")
                                 return [
                                     "The Weeknd - Pray For Me",
                                     "The Weeknd - I Was Never There", 
                                     "Lil Peep - Falling Down"
                                 ]
                     
-                    # Se chegou aqui, pelo menos a playlist existe
-                    print("⚠️ Playlist encontrada mas não conseguiu extrair músicas")
-                    # Retornar músicas conhecidas da playlist para teste
-                    return [
-                        "The Weeknd - Pray For Me",
-                        "The Weeknd - I Was Never There",
-                        "Lil Peep - Falling Down"
+                    # Se chegou aqui, tentar extrair de forma mais agressiva
+                    print("⚠️ Playlist encontrada mas não conseguiu extrair músicas, tentando método alternativo...")
+                    
+                    # Buscar padrões de música mais simples
+                    song_patterns = [
+                        r'"name":"([^"]+)"[^}]*"artists":\[{"name":"([^"]+)"',
+                        r'<meta property="og:title" content="([^"]+)"',
+                        r'"title":"([^"]+)".*?"subtitle":"([^"]+)"'
                     ]
+                    
+                    songs = []
+                    for pattern in song_pat
                         
             except Exception as e:
                 print(f"❌ Erro na tentativa {i+1}: {e}")
