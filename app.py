@@ -95,6 +95,11 @@ def index():
     """Página principal"""
     return render_template('index.html')
 
+@app.route('/get-token')
+def get_token():
+    """Obter token de segurança (simplificado)"""
+    return jsonify({'token': 'simple-token'})
+
 @app.route('/download', methods=['POST'])
 def download():
     """Iniciar download da playlist"""
