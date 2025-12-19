@@ -62,13 +62,23 @@ def download_playlist_async(playlist_url):
         # Executar download
         process = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
         
+        print(f"SpotDL return code: {process.returncode}")
+        print(f"SpotDL stdout: {process.stdout}")
+        print(f"SpotDL stderr: {process.stderr}")
+        
         if process.returncode != 0:
-            raise Exception('Erro no download da playlist')
+            error_msg = process.stderr or process.stdout or 'Erro desconhecido no SpotDL'
+            raise Exception(f'Erro no SpotDL: {error_msg[:200]}')
         
         # Verificar arquivos baixados
         mp3_files = list(Path(output_dir).rglob('*.mp3'))
+        print(f"Arquivos encontrados: {len(mp3_files)}")
+        
         if not mp3_files:
-            raise Exception('Nenhuma música foi baixada')
+            # Verificar se há outros tipos de arquivo
+            all_files = list(Path(output_dir).rglob('*'))
+            print(f"Todos os arquivos: {[f.name for f in all_files]}")
+            raise Exception(f'Nenhuma música MP3 foi baixada. Arquivos encontrados: {len(all_files)}')
         
         download_status['progress'] = f'Criando ZIP com {len(mp3_files)} músicas...'
         
