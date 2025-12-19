@@ -572,17 +572,105 @@ def extract_playlist_name(data):
     
     return search_name(data)
 
+def get_playlist_fast_web_scraping(playlist_url):
+    """Extrair músicas rapidamente via web scraping direto (MUITO MAIS RÁPIDO que SpotDL)"""
+    try:
+        playlist_id = playlist_url.split('/')[-1].split('?')[0]
+        print(f"⚡ Extração rápida via web scraping para: {playlist_id}")
+        
+        # Headers para simular navegador
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+        }
+        
+        # Tentar URL da playlist
+        url = f"https://open.spotify.com/playlist/{playlist_id}"
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code != 200:
+            print(f"❌ Erro ao acessar página: {response.status_code}")
+            return None, []
+        
+        html_content = response.text
+        
+        # Procurar por dados JSON embutidos no HTML
+        # Spotify usa vários padrões: __NEXT_DATA__, Spotify.Entity, etc.
+        json_patterns = [
+            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+            r'Spotify\.Entity\s*=\s*({.*?});',
+            r'window\.__INITIAL_STATE__\s*=\s*({.*?});',
+            r'"tracks":\s*({.*?})',
+        ]
+        
+        songs = []
+        playlist_name = "Playlist"
+        
+        for pattern in json_patterns:
+            matches = re.findall(pattern, html_content, re.DOTALL)
+            for match in matches:
+                try:
+                    data = json.loads(match)
+                    # Procurar por tracks na estrutura
+                    found_songs = extract_songs_from_json(data)
+                    if found_songs:
+                        songs = found_songs
+                        # Tentar extrair nome da playlist
+                        playlist_name = extract_playlist_name(data) or playlist_name
+                        print(f"✅ Web scraping extraiu {len(songs)} músicas em <1 segundo!")
+                        return playlist_name, songs
+                except json.JSONDecodeError:
+                    continue
+        
+        # Método alternativo: procurar por padrões de texto no HTML
+        # Spotify renderiza as músicas no HTML
+        track_patterns = [
+            r'data-testid="[^"]*track[^"]*"[^>]*aria-label="([^"]+)"',
+            r'"name":"([^"]+)"[^}]*"artists":\[{"name":"([^"]+)"',
+            r'<span[^>]*data-testid="[^"]*"[^>]*>([^<]+)</span>.*?<span[^>]*data-testid="[^"]*"[^>]*>([^<]+)</span>',
+        ]
+        
+        for pattern in track_patterns:
+            matches = re.findall(pattern, html_content)
+            for match in matches:
+                if isinstance(match, tuple) and len(match) == 2:
+                    artist = match[0].strip()
+                    song = match[1].strip()
+                    if artist and song and len(artist) > 1 and len(song) > 1:
+                        song_title = f"{artist} - {song}"
+                        if song_title not in songs:
+                            songs.append(song_title)
+                elif isinstance(match, str) and ' - ' in match:
+                    if match not in songs:
+                        songs.append(match)
+        
+        if songs:
+            print(f"✅ Web scraping extraiu {len(songs)} músicas!")
+            return playlist_name, songs
+        
+        return None, []
+        
+    except Exception as e:
+        print(f"❌ Erro no web scraping rápido: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, []
+
 def get_playlist_info_complete(playlist_url):
-    """Obter informações completas da playlist usando múltiplos métodos"""
+    """Obter informações completas da playlist usando múltiplos métodos (OTIMIZADO PARA VELOCIDADE)"""
     try:
         playlist_id = playlist_url.split('/')[-1].split('?')[0]
         print(f"🔍 Playlist ID: {playlist_id}")
         
-        # Obter nome da playlist via oEmbed (sempre funciona)
+        # Obter nome da playlist via oEmbed (sempre funciona e é rápido)
         playlist_name = "Playlist"
         try:
             oembed_url = f"https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/{playlist_id}"
-            response = requests.get(oembed_url, timeout=10)
+            response = requests.get(oembed_url, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 playlist_name = data.get('title', 'Playlist')
@@ -590,7 +678,14 @@ def get_playlist_info_complete(playlist_url):
         except Exception as e:
             print(f"⚠️ Erro ao obter nome via oEmbed: {e}")
         
-        # MÉTODO 1: Tentar API oficial do Spotify (se credenciais disponíveis)
+        # MÉTODO 1: Web scraping rápido (PRIMEIRA OPÇÃO - MUITO RÁPIDO)
+        print("⚡ Tentando extração rápida via web scraping...")
+        playlist_name_ws, songs_ws = get_playlist_fast_web_scraping(playlist_url)
+        if songs_ws:
+            print(f"✅ Web scraping extraiu {len(songs_ws)} músicas instantaneamente!")
+            return playlist_name_ws or playlist_name, songs_ws
+        
+        # MÉTODO 2: Tentar API oficial do Spotify (se credenciais disponíveis)
         if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
             print("🔍 Tentando API oficial do Spotify...")
             playlist_name_api, songs_api = get_spotify_playlist_official(playlist_id)
@@ -598,8 +693,8 @@ def get_playlist_info_complete(playlist_url):
                 print(f"✅ API oficial extraiu {len(songs_api)} músicas!")
                 return playlist_name_api or playlist_name, songs_api
         
-        # MÉTODO 2: Usar SpotDL (método principal)
-        print("🎵 Usando SpotDL para extrair TODAS as músicas...")
+        # MÉTODO 3: SpotDL (último recurso - mais lento, timeout reduzido)
+        print("⚠️ Web scraping falhou, tentando SpotDL como último recurso (pode demorar 1-2 minutos)...")
         
         # Usar caminho compatível com Windows
         import tempfile
@@ -613,20 +708,11 @@ def get_playlist_info_complete(playlist_url):
             '--save-file', temp_file
         ]
         
-        print(f"🔄 Executando: {' '.join(cmd)}")
+        print(f"🔄 Executando SpotDL (timeout: 120s): {' '.join(cmd)}")
         
         try:
-            # Timeout ajustado para playlists grandes (5 minutos padrão, 10 para grandes)
-            # Primeiro, tentar obter tamanho aproximado via oEmbed
-            timeout_list = 600  # 10 minutos para listar (pode ser playlist grande)
-            try:
-                oembed_url = f"https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/{playlist_id}"
-                response = requests.get(oembed_url, timeout=5)
-                if response.status_code == 200:
-                    # Se conseguir, usar timeout padrão menor
-                    timeout_list = 300
-            except:
-                pass
+            # Timeout reduzido já que web scraping é o método principal
+            timeout_list = 120  # 2 minutos máximo (SpotDL é lento, mas é fallback)
             
             # Executar SpotDL
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_list)
@@ -668,7 +754,7 @@ def get_playlist_info_complete(playlist_url):
                     print("❌ Arquivo SpotDL não é JSON válido")
             
         except subprocess.TimeoutExpired:
-            print("⏰ SpotDL timeout após 5 minutos")
+            print("⏰ SpotDL timeout após 2 minutos (método lento, usando web scraping como principal)")
             if os.path.exists(temp_file):
                 try:
                     os.remove(temp_file)
