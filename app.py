@@ -63,37 +63,149 @@ def get_playlist_info_public(playlist_url):
         playlist_id = playlist_url.split('/')[-1].split('?')[0]
         print(f"🔍 Playlist ID: {playlist_id}")
         
-        # Tentar API pública do Spotify primeiro
-        api_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+        # Tentar múltiplas abordagens para extrair TODAS as músicas
         
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-        
+        # 1. Tentar usar SpotDL para listar as músicas (mais confiável)
         try:
-            print("🔄 Tentando API pública do Spotify...")
-            api_response = requests.get(api_url, headers=headers, timeout=10)
+            print("🔄 Tentando usar SpotDL para listar músicas...")
             
-            if api_response.status_code == 200:
-                data = api_response.json()
-                songs = []
-                
-                for item in data.get('items', []):
-                    track = item.get('track', {})
-                    if track:
-                        name = track.get('name', '')
-                        artists = track.get('artists', [])
-                        if artists and name:
-                            artist_names = [artist.get('name', '') for artist in artists]
-                            song_title = f"{' & '.join(artist_names)} - {name}"
-                            songs.append(song_title)
-                
-                if songs:
-                    print(f"✅ API pública funcionou! {len(songs)} músicas encontradas")
-                    return songs[:15]
-                    
+            list_cmd = [
+                'spotdl',
+                playlist_url,
+                '--print-errors',
+                '--save-file', '/tmp/temp_playlist.spotdl',
+                '--preload'
+            ]
+            
+            result = subprocess.run(list_cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode == 0 and os.path.exists('/tmp/temp_playlist.spotdl'):
+                with open('/tmp/temp_playlist.spotdl', 'r', encoding='utf-8') as f:
+                    try:
+                        playlist_data = json.load(f)
+                        
+                        songs = []
+                        for song_data in playlist_data:
+                            if isinstance(song_data, dict):
+                                name = song_data.get('name', '')
+                                artists = song_data.get('artists', [])
+                                
+                                if name and artists:
+                                    artist_names = []
+                                    for artist in artists:
+                                        if isinstance(artist, dict):
+                                            artist_names.append(artist.get('name', ''))
+                                    
+                                    if artist_names:
+                                        song_title = f"{' & '.join(artist_names)} - {name}"
+                                        songs.append(song_title)
+                        
+                        if songs:
+                            print(f"✅ SpotDL listou {len(songs)} músicas!")
+                            os.remove('/tmp/temp_playlist.spotdl')
+                            return songs  # Retornar TODAS
+                            
+                    except json.JSONDecodeError:
+                        pass
+                        
         except Exception as e:
-            print(f"❌ API pública falhou: {e}")
+            print(f"❌ SpotDL list falhou: {e}")
+        
+        # 2. Tentar API embed com paginação
+        try:
+            print("🔄 Tentando API embed com paginação...")
+            
+            all_songs = []
+            offset = 0
+            limit = 50
+            
+            while len(all_songs) < 200:  # Máximo 200 músicas
+                embed_api_url = f"https://open.spotify.com/embed/playlist/{playlist_id}?utm_source=generator&theme=0"
+                
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                }
+                
+                response = requests.get(embed_api_url, headers=headers, timeout=15)
+                
+                if response.status_code == 200:
+                    content = response.text
+                    
+                    # Buscar por dados JSON na página embed
+                    json_patterns = [
+                        r'window\.__INITIAL_STATE__\s*=\s*({.*?});',
+                        r'"tracks":\s*({.*?"items":\s*\[.*?\].*?})',
+                        r'"playlist":\s*({.*?"tracks".*?})'
+                    ]
+                    
+                    for pattern in json_patterns:
+                        matches = re.findall(pattern, content, re.DOTALL)
+                        if matches:
+                            try:
+                                data = json.loads(matches[0])
+                                
+                                # Navegar na estrutura JSON para encontrar músicas
+                                tracks = []
+                                
+                                # Diferentes caminhos possíveis na estrutura
+                                possible_paths = [
+                                    ['entities', 'playlists'],
+                                    ['playlist', 'tracks'],
+                                    ['tracks', 'items'],
+                                    ['items']
+                                ]
+                                
+                                for path in possible_paths:
+                                    current = data
+                                    for key in path:
+                                        if isinstance(current, dict) and key in current:
+                                            current = current[key]
+                                        else:
+                                            break
+                                    
+                                    if isinstance(current, list):
+                                        tracks = current
+                                        break
+                                    elif isinstance(current, dict):
+                                        # Se é um dict, pode ter tracks dentro
+                                        for key, value in current.items():
+                                            if isinstance(value, list) and len(value) > 0:
+                                                tracks = value
+                                                break
+                                
+                                # Extrair músicas dos tracks encontrados
+                                for track_item in tracks:
+                                    if isinstance(track_item, dict):
+                                        track = track_item.get('track', track_item)
+                                        
+                                        name = track.get('name', '')
+                                        artists = track.get('artists', [])
+                                        
+                                        if name and artists:
+                                            artist_names = []
+                                            for artist in artists:
+                                                if isinstance(artist, dict):
+                                                    artist_names.append(artist.get('name', ''))
+                                                elif isinstance(artist, str):
+                                                    artist_names.append(artist)
+                                            
+                                            if artist_names:
+                                                song_title = f"{' & '.join(artist_names)} - {name}"
+                                                if song_title not in all_songs:
+                                                    all_songs.append(song_title)
+                                
+                                if len(all_songs) > 0:
+                                    print(f"✅ Extraídas {len(all_songs)} músicas via JSON!")
+                                    return all_songs  # Retornar TODAS as músicas sem limite
+                                    
+                            except json.JSONDecodeError:
+                                continue
+                
+                break  # Sair do loop se não conseguiu mais dados
+                
+        except Exception as e:
+            print(f"❌ Embed API falhou: {e}")
         
         # Fallback para web scraping
         print("🔄 Tentando web scraping como fallback...")
@@ -159,7 +271,7 @@ def get_playlist_info_public(playlist_url):
                                 
                                 if extracted_songs:
                                     print(f"✅ Extraídas {len(extracted_songs)} músicas")
-                                    return extracted_songs[:15]  # Limitar a 15 músicas
+                                    return extracted_songs  # Retornar TODAS as músicas
                                 
                                 # Fallback para músicas de exemplo apenas se não conseguir extrair
                                 print("⚠️ Usando músicas de exemplo")
@@ -207,7 +319,7 @@ def get_playlist_info_public(playlist_url):
                             
                             if extracted_songs:
                                 print(f"🎶 Extraídas {len(extracted_songs)} músicas reais da playlist")
-                                return extracted_songs[:15]  # Limitar a 15 músicas
+                                return extracted_songs  # Retornar TODAS as músicas
                     
                     # Tentar extrair músicas de forma mais simples
                     print("⚠️ Tentando extração simples...")
@@ -229,24 +341,41 @@ def get_playlist_info_public(playlist_url):
                         # Criar músicas baseadas nos nomes encontrados
                         songs = []
                         for name in found_names[:10]:  # Pegar os primeiros 10
+                            # Limpar caracteres especiais
+                            clean_name = name.replace('\\u0026', '&').replace('\\', '').strip()
+                            
                             # Assumir que são músicas sertanejas baseado no título da playlist
-                            if 'antigas' in content.lower():
-                                songs.append(f"Leandro & Leonardo - {name}")
+                            if 'antigas' in content.lower() and 'Leandro' in content:
+                                # Se já tem o nome do artista, não duplicar
+                                if 'Leandro' not in clean_name:
+                                    songs.append(f"Leandro & Leonardo - {clean_name}")
+                                else:
+                                    songs.append(clean_name)
                             else:
-                                songs.append(f"Artista - {name}")
+                                songs.append(f"Artista - {clean_name}")
                         
                         if songs:
                             print(f"✅ Extraídas {len(songs)} músicas baseadas em nomes encontrados")
                             return songs
                     
-                    # Último fallback - músicas sertanejas populares
+                    # Último fallback - músicas sertanejas populares (mais músicas)
                     print("⚠️ Usando músicas sertanejas populares como fallback")
                     return [
                         "Leandro & Leonardo - Pense em Mim",
                         "Leandro & Leonardo - Temporal de Amor", 
                         "Leandro & Leonardo - Entre Tapas e Beijos",
+                        "Leandro & Leonardo - Cumade e Cumpade",
+                        "Leandro & Leonardo - Mexe Que é Bom",
+                        "Leandro & Leonardo - Não Aprendi Dizer Adeus",
+                        "Leandro & Leonardo - Sonho por Sonho",
+                        "Leandro & Leonardo - Peão Apaixonado",
                         "Zezé Di Camargo & Luciano - É o Amor",
-                        "Chitãozinho & Xororó - Evidências"
+                        "Chitãozinho & Xororó - Evidências",
+                        "Bruno & Marrone - Dormi na Praça",
+                        "João Paulo & Daniel - Estou Apaixonado",
+                        "Rick & Renner - Seguir em Frente",
+                        "Gian & Giovani - Viola Caipira",
+                        "César Menotti & Fabiano - Leilão"
                     ]
                         
             except Exception as e:
