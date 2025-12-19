@@ -107,11 +107,11 @@ def get_playlist_info_public(playlist_url):
         return None
 
 def download_song_youtube(song_title, output_dir):
-    """Baixar música do YouTube usando yt-dlp"""
+    """Baixar música do YouTube usando yt-dlp com anti-bot"""
     try:
         print(f"🎵 Baixando: {song_title}")
         
-        # Comando yt-dlp otimizado
+        # Comando yt-dlp com configurações anti-bot
         cmd = [
             'yt-dlp',
             f'ytsearch1:{song_title} audio',
@@ -121,16 +121,42 @@ def download_song_youtube(song_title, output_dir):
             '--output', f'{output_dir}/%(title)s.%(ext)s',
             '--no-playlist',
             '--quiet',
-            '--no-warnings'
+            '--no-warnings',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--referer', 'https://www.google.com/',
+            '--add-header', 'Accept-Language:en-US,en;q=0.9',
+            '--sleep-interval', '2',
+            '--max-sleep-interval', '5'
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         
         if result.returncode == 0:
             print(f"✅ Sucesso: {song_title}")
             return True
         else:
             print(f"❌ Falhou: {song_title} - {result.stderr}")
+            
+            # Tentar com fonte alternativa se YouTube falhar
+            print(f"🔄 Tentando fonte alternativa para: {song_title}")
+            alt_cmd = [
+                'yt-dlp',
+                f'ytsearch1:{song_title}',
+                '--extract-audio',
+                '--audio-format', 'mp3',
+                '--audio-quality', '96K',  # Qualidade menor
+                '--output', f'{output_dir}/%(title)s.%(ext)s',
+                '--no-playlist',
+                '--quiet',
+                '--ignore-errors',
+                '--no-check-certificate'
+            ]
+            
+            alt_result = subprocess.run(alt_cmd, capture_output=True, text=True, timeout=120)
+            if alt_result.returncode == 0:
+                print(f"✅ Sucesso alternativo: {song_title}")
+                return True
+            
             return False
             
     except subprocess.TimeoutExpired:
