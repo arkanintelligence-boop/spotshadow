@@ -103,34 +103,60 @@ def download_playlist_async(playlist_url):
         if process.stderr:
             print(f"⚠️ SpotDL stderr:\n{process.stderr}")
         
-        # Verificar se houve erro
-        if process.returncode != 0:
-            error_output = process.stderr or process.stdout or 'Erro desconhecido'
+        # Verificar se houve erro OU se há erros de download mesmo com código 0
+        error_output = process.stderr or process.stdout or ''
+        has_download_errors = 'AudioProviderError' in error_output or 'YT-DLP download error' in error_output
+        
+        if process.returncode != 0 or has_download_errors:
+            print(f"🚨 Detectado problema de download. Return code: {process.returncode}")
             
             # Verificar tipos específicos de erro
-            if 'rate limit' in error_output.lower() or 'too many requests' in error_output.lower():
-                # Tentar novamente após aguardar
-                print("🔄 Rate limit detectado, tentando novamente em 30 segundos...")
-                time.sleep(30)
+            if 'rate limit' in error_output.lower() or 'too many requests' in error_output.lower() or has_download_errors:
+                print("🔄 Problemas de download detectados, tentando com outros provedores...")
                 
-                # Segunda tentativa com configurações mais conservadoras
-                retry_cmd = [
-                    'spotdl', 
-                    playlist_url, 
-                    '--output', output_dir,
-                    '--threads', '1',
-                    '--audio', 'youtube-music',
-                    '--bitrate', '96k'  # Bitrate ainda menor
-                ]
+                # Lista de provedores alternativos para tentar
+                providers = ['soundcloud', 'bandcamp', 'youtube']
                 
-                print(f"🔄 Segunda tentativa: {' '.join(retry_cmd)}")
-                retry_process = subprocess.run(retry_cmd, capture_output=True, text=True, timeout=300)
-                
-                if retry_process.returncode == 0:
-                    print("✅ Segunda tentativa bem-sucedida!")
-                    process = retry_process  # Usar resultado da segunda tentativa
+                for provider in providers:
+                    print(f"🔄 Tentando com {provider}...")
+                    time.sleep(15)  # Aguardar entre tentativas
+                    
+                    retry_cmd = [
+                        'spotdl', 
+                        playlist_url, 
+                        '--output', output_dir,
+                        '--threads', '1',
+                        '--audio', provider,
+                        '--bitrate', '128k',
+                        '--format', 'mp3'
+                    ]
+                    
+                    print(f"🔄 Comando: {' '.join(retry_cmd)}")
+                    
+                    try:
+                        retry_process = subprocess.run(retry_cmd, capture_output=True, text=True, timeout=240)
+                        
+                        if retry_process.stdout:
+                            print(f"📝 {provider} stdout: {retry_process.stdout}")
+                        if retry_process.stderr:
+                            print(f"⚠️ {provider} stderr: {retry_process.stderr}")
+                        
+                        # Verificar se esta tentativa funcionou
+                        retry_mp3_files = list(Path(output_dir).rglob('*.mp3'))
+                        if len(retry_mp3_files) > 0:
+                            print(f"✅ Sucesso com {provider}! {len(retry_mp3_files)} arquivos baixados")
+                            process = retry_process  # Usar resultado desta tentativa
+                            break
+                        else:
+                            print(f"❌ {provider} não funcionou, tentando próximo...")
+                            
+                    except subprocess.TimeoutExpired:
+                        print(f"⏰ Timeout com {provider}, tentando próximo...")
+                        continue
                 else:
-                    raise Exception('YouTube está limitando as requisições do seu servidor. Tente novamente em alguns minutos ou use uma VPN.')
+                    # Se chegou aqui, nenhum provedor funcionou
+                    raise Exception('Todos os provedores de áudio falharam. O YouTube pode estar bloqueando seu servidor. Tente usar uma VPN ou aguarde alguns minutos.')
+                    
             elif 'network' in error_output.lower() or 'connection' in error_output.lower():
                 raise Exception('Erro de conexão. Verifique sua internet e tente novamente.')
             else:
