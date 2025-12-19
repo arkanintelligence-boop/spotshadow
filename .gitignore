@@ -8,6 +8,9 @@
 !app.py
 !requirements.txt
 !runtime.txt
+!Procfile
+!start.sh
+!install_ffmpeg.sh
 !README.md
 !.gitignore
 !Dockerfile
