@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-SpotShadow - Spotify Playlist Downloader
-Interface web elegante para baixar playlists do Spotify
+SpotShadow - Versão Híbrida com múltiplas estratégias
 """
 
 from flask import Flask, render_template, request, jsonify, send_file
@@ -11,6 +10,8 @@ import zipfile
 import threading
 from pathlib import Path
 import shutil
+import requests
+import json
 
 app = Flask(__name__)
 
@@ -22,308 +23,197 @@ download_status = {
     'error_message': ''
 }
 
-def check_spotdl():
-    """Verifica se o spotDL está disponível"""
+def try_alternative_download(song_name, output_dir):
+    """Tenta baixar usando yt-dlp diretamente"""
     try:
-        subprocess.run(['spotdl', '--version'], check=True, capture_output=True)
-        return True
-    except:
+        # Buscar no YouTube diretamente
+        search_query = f"{song_name} audio"
+        cmd = [
+            'yt-dlp',
+            f'ytsearch1:{search_query}',
+            '--extract-audio',
+            '--audio-format', 'mp3',
+            '--audio-quality', '128K',
+            '--output', f'{output_dir}/%(title)s.%(ext)s',
+            '--no-playlist'
+        ]
+        
+        print(f"🔍 Tentando yt-dlp para: {song_name}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        
+        if result.returncode == 0:
+            print(f"✅ Sucesso com yt-dlp: {song_name}")
+            return True
+        else:
+            print(f"❌ Falhou yt-dlp: {song_name}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Erro yt-dlp: {e}")
         return False
 
-def get_playlist_name(playlist_url):
-    """Obtém o nome da playlist"""
-    return playlist_url.split('/')[-1].split('?')[0]
-
-def download_playlist_async(playlist_url):
-    """Download assíncrono da playlist"""
+def download_playlist_hybrid(playlist_url):
+    """Download híbrido com múltiplas estratégias"""
     global download_status
     
     try:
         download_status['status'] = 'downloading'
-        download_status['progress'] = 'Iniciando download...'
+        download_status['progress'] = 'Iniciando download híbrido...'
         
         # Extrair ID da playlist
         playlist_id = playlist_url.split('/')[-1].split('?')[0]
-        playlist_name = get_playlist_name(playlist_url)
+        playlist_name = f"playlist_{playlist_id}"
+        output_dir = f"downloads/{playlist_name}"
         
-        output_dir = f"downloads/playlist_{playlist_id}"
-        
-        # Limpar diretório anterior se existir
+        # Limpar diretório anterior
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
-        
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        # Testar se conseguimos escrever no diretório
-        test_file = Path(output_dir) / "test_write.txt"
-        try:
-            test_file.write_text("teste de escrita")
-            test_file.unlink()  # Deletar arquivo de teste
-            print(f"✅ Permissão de escrita OK em {output_dir}")
-        except Exception as e:
-            print(f"❌ Erro de permissão em {output_dir}: {e}")
-            raise Exception(f'Erro de permissão no diretório: {e}')
+        download_status['progress'] = 'Obtendo informações da playlist...'
         
-        download_status['progress'] = 'Conectando ao Spotify...'
-        
-        # Aguardar mais tempo para evitar rate limit
-        import time
-        print("⏳ Aguardando 30 segundos para evitar rate limiting...")
-        time.sleep(30)  # Aguardar mais tempo
-        
-        # Testar conectividade primeiro
-        print("🔍 Testando SpotDL...")
-        version_cmd = ['spotdl', '--version']
-        version_result = subprocess.run(version_cmd, capture_output=True, text=True, timeout=10)
-        print(f"SpotDL version: {version_result.stdout.strip()}")
-        
-        # Estratégia alternativa: usar yt-dlp diretamente
-        print("🔄 Tentando abordagem alternativa com yt-dlp...")
-        
-        # Primeiro, obter URLs das músicas do Spotify
+        # Primeiro: obter lista de músicas
         info_cmd = [
             'spotdl', 
             playlist_url,
             '--save-file', f'{output_dir}/playlist.spotdl',
-            '--preload'  # Só obter informações, não baixar
+            '--preload'
         ]
         
-        print(f"📋 Obtendo informações da playlist: {' '.join(info_cmd)}")
+        subprocess.run(info_cmd, capture_output=True, text=True, timeout=60)
         
-        try:
-            info_process = subprocess.run(info_cmd, capture_output=True, text=True, timeout=60)
-            print(f"Info process return code: {info_process.returncode}")
-            if info_process.stdout:
-                print(f"Info stdout: {info_process.stdout}")
-        except Exception as e:
-            print(f"Erro ao obter informações: {e}")
-        
-        # Comando SpotDL normal como fallback
-        cmd = [
-            'spotdl', 
-            playlist_url, 
-            '--output', output_dir,
-            '--threads', '1',
-            '--format', 'mp3',
-            '--bitrate', '96k',  # Bitrate ainda menor
-            '--audio', 'soundcloud'  # Tentar SoundCloud primeiro
-        ]
-        
-        print(f"🎵 Executando comando: {' '.join(cmd)}")
-        download_status['progress'] = 'Processando playlist...'
-        
-        # Executar com timeout menor para teste
-        try:
-            print(f"⏰ Iniciando SpotDL com timeout de 3 minutos...")
-            process = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True, 
-                timeout=180,  # 3 minutos timeout para teste
-                cwd='/app'
-            )
-        except subprocess.TimeoutExpired:
-            print("❌ SpotDL timeout após 3 minutos - possível rate limiting")
-            raise Exception('SpotDL travou (timeout de 3 minutos). Isso geralmente indica rate limiting do YouTube. Tente novamente em alguns minutos.')
-        
-        print(f"✅ SpotDL finalizado com código: {process.returncode}")
-        
-        # Log detalhado da saída
-        if process.stdout:
-            print(f"📝 SpotDL stdout:\n{process.stdout}")
-        if process.stderr:
-            print(f"⚠️ SpotDL stderr:\n{process.stderr}")
-        
-        # Verificar se houve erro OU se há erros de download mesmo com código 0
-        error_output = process.stderr or process.stdout or ''
-        has_download_errors = 'AudioProviderError' in error_output or 'YT-DLP download error' in error_output
-        
-        if process.returncode != 0 or has_download_errors:
-            print(f"🚨 Detectado problema de download. Return code: {process.returncode}")
+        # Ler arquivo de playlist
+        playlist_file = Path(output_dir) / 'playlist.spotdl'
+        if playlist_file.exists():
+            with open(playlist_file, 'r', encoding='utf-8') as f:
+                songs = [line.strip() for line in f if line.strip()]
             
-            # Verificar tipos específicos de erro
-            if 'rate limit' in error_output.lower() or 'too many requests' in error_output.lower() or has_download_errors:
-                print("🔄 Problemas de download detectados, tentando com outros provedores...")
+            download_status['progress'] = f'Encontradas {len(songs)} músicas. Baixando...'
+            
+            successful_downloads = 0
+            
+            for i, song in enumerate(songs):
+                download_status['progress'] = f'Baixando {i+1}/{len(songs)}: {song[:50]}...'
                 
-                # Lista de provedores alternativos para tentar
-                providers = ['soundcloud', 'bandcamp', 'youtube']
+                # Estratégia 1: Tentar yt-dlp diretamente
+                if try_alternative_download(song, output_dir):
+                    successful_downloads += 1
+                    continue
                 
-                for provider in providers:
-                    print(f"🔄 Tentando com {provider}...")
-                    time.sleep(15)  # Aguardar entre tentativas
-                    
-                    retry_cmd = [
-                        'spotdl', 
-                        playlist_url, 
-                        '--output', output_dir,
-                        '--threads', '1',
-                        '--audio', provider,
-                        '--bitrate', '128k',
-                        '--format', 'mp3'
-                    ]
-                    
-                    print(f"🔄 Comando: {' '.join(retry_cmd)}")
-                    
+                # Estratégia 2: Tentar SpotDL com diferentes provedores
+                for provider in ['soundcloud', 'bandcamp']:
                     try:
-                        retry_process = subprocess.run(retry_cmd, capture_output=True, text=True, timeout=240)
+                        cmd = [
+                            'spotdl', 
+                            song,
+                            '--output', output_dir,
+                            '--audio', provider,
+                            '--format', 'mp3',
+                            '--bitrate', '128k'
+                        ]
                         
-                        if retry_process.stdout:
-                            print(f"📝 {provider} stdout: {retry_process.stdout}")
-                        if retry_process.stderr:
-                            print(f"⚠️ {provider} stderr: {retry_process.stderr}")
-                        
-                        # Verificar se esta tentativa funcionou
-                        retry_mp3_files = list(Path(output_dir).rglob('*.mp3'))
-                        if len(retry_mp3_files) > 0:
-                            print(f"✅ Sucesso com {provider}! {len(retry_mp3_files)} arquivos baixados")
-                            process = retry_process  # Usar resultado desta tentativa
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                        if result.returncode == 0:
+                            successful_downloads += 1
                             break
-                        else:
-                            print(f"❌ {provider} não funcionou, tentando próximo...")
-                            
-                    except subprocess.TimeoutExpired:
-                        print(f"⏰ Timeout com {provider}, tentando próximo...")
+                    except:
                         continue
-                else:
-                    # Se chegou aqui, nenhum provedor funcionou
-                    raise Exception('Todos os provedores de áudio falharam. O YouTube pode estar bloqueando seu servidor. Tente usar uma VPN ou aguarde alguns minutos.')
-                    
-            elif 'network' in error_output.lower() or 'connection' in error_output.lower():
-                raise Exception('Erro de conexão. Verifique sua internet e tente novamente.')
-            else:
-                raise Exception(f'Erro no SpotDL: {error_output[:300]}')
-        
-        download_status['progress'] = 'Verificando arquivos baixados...'
-        
-        # Verificar arquivos baixados
-        mp3_files = list(Path(output_dir).rglob('*.mp3'))
-        print(f"🎶 Arquivos MP3 encontrados: {len(mp3_files)}")
-        
-        if not mp3_files:
-            # Verificar todos os arquivos para debug
-            all_files = list(Path(output_dir).rglob('*'))
-            file_names = [f.name for f in all_files if f.is_file()]
-            print(f"📁 Todos os arquivos encontrados: {file_names}")
             
-            if not file_names:
-                raise Exception('Nenhum arquivo foi baixado. Verifique se a playlist é pública.')
+            # Verificar arquivos baixados
+            mp3_files = list(Path(output_dir).rglob('*.mp3'))
+            
+            if mp3_files:
+                download_status['progress'] = f'Criando ZIP com {len(mp3_files)} músicas...'
+                
+                # Criar ZIP
+                zip_name = f"downloads/{playlist_name}.zip"
+                with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for file_path in mp3_files:
+                        clean_name = file_path.name.replace('_', ' ')
+                        zipf.write(file_path, clean_name)
+                
+                # Limpar pasta temporária
+                shutil.rmtree(output_dir)
+                
+                download_status['status'] = 'completed'
+                download_status['progress'] = f'✅ Download concluído! {len(mp3_files)} de {len(songs)} músicas baixadas.'
+                download_status['zip_file'] = zip_name
             else:
-                raise Exception(f'Nenhuma música MP3 foi baixada. Arquivos encontrados: {", ".join(file_names[:5])}')
-        
-        download_status['progress'] = f'Criando ZIP com {len(mp3_files)} músicas...'
-        
-        # Criar ZIP
-        zip_name = f"downloads/{playlist_name}.zip"
-        with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file_path in mp3_files:
-                # Usar nome mais limpo para o arquivo no ZIP
-                clean_name = file_path.name.replace('_', ' ')
-                zipf.write(file_path, clean_name)
-        
-        # Limpar pasta temporária
-        shutil.rmtree(output_dir)
-        
-        download_status['status'] = 'completed'
-        download_status['progress'] = f'✅ Download concluído! {len(mp3_files)} músicas prontas.'
-        download_status['zip_file'] = zip_name
-        
-        print(f"🎉 Download concluído com sucesso: {len(mp3_files)} músicas")
-        
+                raise Exception(f'Nenhuma música foi baixada. Todas as {len(songs)} músicas falharam.')
+        else:
+            raise Exception('Não foi possível obter informações da playlist.')
+            
     except Exception as e:
-        error_msg = str(e)
-        print(f"💥 Erro no download: {error_msg}")
-        
         download_status['status'] = 'error'
-        download_status['error_message'] = error_msg
-        download_status['progress'] = f'❌ Erro: {error_msg}'
+        download_status['error_message'] = str(e)
+        download_status['progress'] = f'❌ Erro: {str(e)}'
 
 @app.route('/')
 def index():
-    """Página principal"""
     return render_template('index.html')
 
 @app.route('/get-token')
 def get_token():
-    """Obter token de segurança (simplificado)"""
-    return jsonify({'token': 'simple-token'})
+    return jsonify({'token': 'hybrid-token'})
 
 @app.route('/download', methods=['POST'])
 def download():
-    """Iniciar download da playlist"""
     global download_status
     
     data = request.get_json()
-    if not data:
-        return jsonify({'error': 'Dados inválidos'}), 400
-        
     playlist_url = data.get('url', '').strip()
     
-    if not playlist_url:
-        return jsonify({'error': 'URL não fornecida'}), 400
-    
-    if 'spotify.com/playlist/' not in playlist_url:
-        return jsonify({'error': 'URL inválida. Use uma URL de playlist do Spotify'}), 400
+    if not playlist_url or 'spotify.com/playlist/' not in playlist_url:
+        return jsonify({'error': 'URL inválida'}), 400
     
     if download_status['status'] == 'downloading':
-        return jsonify({'error': 'Já existe um download em andamento'}), 400
-    
-    # Verificar spotDL
-    if not check_spotdl():
-        return jsonify({'error': 'SpotDL não disponível'}), 500
+        return jsonify({'error': 'Download em andamento'}), 400
     
     # Resetar status
     download_status = {
         'status': 'downloading',
-        'progress': 'Preparando download...',
+        'progress': 'Preparando download híbrido...',
         'zip_file': None,
         'error_message': ''
     }
     
     # Iniciar download em thread separada
-    thread = threading.Thread(target=download_playlist_async, args=(playlist_url,))
+    thread = threading.Thread(target=download_playlist_hybrid, args=(playlist_url,))
     thread.daemon = True
     thread.start()
     
-    return jsonify({'message': 'Download iniciado'})
+    return jsonify({'message': 'Download híbrido iniciado'})
 
 @app.route('/status')
 def status():
-    """Verificar status do download"""
     return jsonify(download_status)
 
 @app.route('/download-zip')
 def download_zip():
-    """Baixar arquivo ZIP"""
     if download_status['status'] == 'completed' and download_status['zip_file']:
         zip_path = download_status['zip_file']
         if os.path.exists(zip_path):
             return send_file(zip_path, as_attachment=True, download_name=os.path.basename(zip_path))
-    
     return jsonify({'error': 'Arquivo não encontrado'}), 404
 
 @app.route('/favicon.png')
 def favicon():
-    """Servir favicon"""
     if os.path.exists('favicon.png'):
         return send_file('favicon.png', mimetype='image/png')
     return '', 404
 
 @app.route('/logotipo-semfundo.png')
 def logo():
-    """Servir logotipo"""
     if os.path.exists('logotipo-semfundo.png'):
         return send_file('logotipo-semfundo.png', mimetype='image/png')
     return '', 404
 
 if __name__ == '__main__':
-    # Criar diretório de downloads
     Path('downloads').mkdir(exist_ok=True)
-    
-    # Configuração
     port = int(os.environ.get('PORT', 5000))
     host = os.environ.get('HOST', '0.0.0.0')
     
-    print("🎵 SpotShadow - Spotify Playlist Downloader")
+    print("🎵 SpotShadow - Versão Híbrida")
     print(f"🌐 Servidor iniciando na porta {port}")
     
     app.run(debug=False, host=host, port=port)
