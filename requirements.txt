@@ -1,3 +1,4 @@
 spotdl
 flask
 yt-dlp
+requests
