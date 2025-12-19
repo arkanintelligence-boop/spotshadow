@@ -186,16 +186,14 @@ def download_playlist_async(playlist_url):
         # Verificar se a playlist é acessível tentando salvar metadados
         download_status['progress'] = 'Verificando playlist...'
         
-        # Comando spotDL otimizado para velocidade máxima
+        # Comando spotDL otimizado (argumentos válidos para v4.1.7)
         cmd = [
             'spotdl',
             playlist_url,
             '--output', output_dir,
-            '--threads', '16',          # 16 downloads simultâneos (MUITO MAIS RÁPIDO)
+            '--threads', '8',           # 8 downloads simultâneos
             '--bitrate', '192k',        # Boa qualidade mas rápido
-            '--format', 'mp3',
-            '--audio-provider', 'youtube-music',  # Fonte mais rápida
-            '--simple-tui'
+            '--format', 'mp3'
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
