@@ -73,7 +73,7 @@ def download_playlist_async(playlist_url):
             playlist_url, 
             '--output', output_dir,
             '--threads', '1',
-            '--audio-provider', 'youtube-music',  # Usar YouTube Music em vez do YouTube normal
+            '--audio', 'youtube-music',  # Usar YouTube Music em vez do YouTube normal
             '--bitrate', '128k',  # Bitrate menor para ser mais rápido
             '--format', 'mp3'
         ]
@@ -119,7 +119,7 @@ def download_playlist_async(playlist_url):
                     playlist_url, 
                     '--output', output_dir,
                     '--threads', '1',
-                    '--audio-provider', 'youtube-music',
+                    '--audio', 'youtube-music',
                     '--bitrate', '96k'  # Bitrate ainda menor
                 ]
                 
