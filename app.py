@@ -266,7 +266,7 @@ def index():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpotShadow - Spotify Playlist Downloader</title>
-    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(to bottom, #08a901, #053912); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: white; }
@@ -292,9 +292,10 @@ def index():
 <body>
     <div class="container">
         <div class="logo">
-            <img src="/logotipo-semfundo.png" alt="SpotShadow Logo" style="max-width: 150px; max-height: 150px; margin-bottom: 20px;" onerror="this.style.display='none'">
+            <div style="font-size: 4em; margin-bottom: 10px; background: linear-gradient(45deg, #1db954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🎵</div>
+            <div style="font-size: 1.5em; font-weight: bold; color: #1db954; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); margin-bottom: 10px;">SpotShadow</div>
         </div>
-        <h1>🎵 Spotify Playlist Downloader</h1>
+        <h1 style="font-size: 1.3em; margin-bottom: 30px;">Spotify Playlist Downloader</h1>
         <form id="downloadForm">
             <input type="url" id="playlistUrl" placeholder="Cole aqui o link da playlist do Spotify..." required>
             <button type="submit" class="btn" id="downloadBtn">Baixar Playlist</button>
