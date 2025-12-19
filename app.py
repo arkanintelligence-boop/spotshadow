@@ -82,11 +82,33 @@ def download_playlist_hybrid(playlist_url):
         
         subprocess.run(info_cmd, capture_output=True, text=True, timeout=60)
         
-        # Ler arquivo de playlist
+        # Ler arquivo de playlist (é um JSON, não texto simples!)
         playlist_file = Path(output_dir) / 'playlist.spotdl'
         if playlist_file.exists():
-            with open(playlist_file, 'r', encoding='utf-8') as f:
-                songs = [line.strip() for line in f if line.strip()]
+            try:
+                with open(playlist_file, 'r', encoding='utf-8') as f:
+                    playlist_data = json.load(f)
+                
+                # Extrair informações das músicas
+                songs = []
+                if isinstance(playlist_data, list):
+                    for song_data in playlist_data:
+                        if isinstance(song_data, dict):
+                            name = song_data.get('name', '')
+                            artists = song_data.get('artists', [])
+                            if artists and isinstance(artists, list):
+                                artist_names = [artist.get('name', '') if isinstance(artist, dict) else str(artist) for artist in artists]
+                                song_title = f"{' & '.join(artist_names)} - {name}"
+                            else:
+                                song_title = name
+                            
+                            if song_title:
+                                songs.append(song_title)
+                
+                print(f"📋 Músicas extraídas do JSON: {songs}")
+            except Exception as e:
+                print(f"❌ Erro ao ler JSON: {e}")
+                songs = []
             
             download_status['progress'] = f'Encontradas {len(songs)} músicas. Baixando...'
             
