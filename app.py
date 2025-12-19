@@ -124,17 +124,30 @@ def install_spotdl():
         return False
 
 def get_playlist_name(playlist_url):
-    """Obtém o nome da playlist usando yt-dlp"""
+    """Obtém o nome da playlist usando spotDL"""
     try:
-        # Usar yt-dlp para obter informações da playlist
-        cmd = ['yt-dlp', '--flat-playlist', '--print', 'playlist_title', playlist_url]
+        # Usar spotDL para obter informações da playlist
+        cmd = ['spotdl', 'save', playlist_url, '--save-file', 'temp_playlist.spotdl']
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         
-        if result.returncode == 0 and result.stdout.strip():
-            playlist_name = result.stdout.strip()
-            # Limpar caracteres inválidos para nome de arquivo
-            playlist_name = re.sub(r'[<>:"/\\|?*]', '_', playlist_name)
-            return playlist_name
+        if result.returncode == 0 and os.path.exists('temp_playlist.spotdl'):
+            # Ler a primeira linha que contém informações da playlist
+            with open('temp_playlist.spotdl', 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip()
+                # Extrair nome da playlist do output do spotDL
+                if 'Found' in result.stdout and 'in' in result.stdout:
+                    # Exemplo: "Found 142 songs in Leandro & Leonardo – Só as antigas (Playlist)"
+                    parts = result.stdout.split(' in ')
+                    if len(parts) > 1:
+                        playlist_info = parts[1].split('\n')[0]
+                        # Remover "(Playlist)" do final
+                        playlist_name = playlist_info.replace(' (Playlist)', '').strip()
+                        # Limpar caracteres inválidos para nome de arquivo
+                        playlist_name = re.sub(r'[<>:"/\\|?*]', '_', playlist_name)
+                        os.remove('temp_playlist.spotdl')
+                        return playlist_name
+            
+            os.remove('temp_playlist.spotdl')
     except Exception as e:
         print(f"⚠️ Erro ao obter nome da playlist: {e}")
     
@@ -169,15 +182,14 @@ def download_playlist_async(playlist_url):
         # Verificar se a playlist é acessível tentando salvar metadados
         download_status['progress'] = 'Verificando playlist...'
         
-        # Comando spotDL com configurações otimizadas
+        # Comando spotDL simplificado
         cmd = [
             'spotdl',
             'download',
             playlist_url,
             '--output', output_dir,
             '--format', 'mp3',
-            '--bitrate', '320k',
-            '--threads', '4'
+            '--bitrate', '320k'
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
