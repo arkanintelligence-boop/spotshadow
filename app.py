@@ -65,11 +65,15 @@ def download_playlist_async(playlist_url):
             'spotdl', 
             playlist_url, 
             '--output', output_dir,
-            '--threads', '1'  # Usar apenas 1 thread para ser mais "gentil"
+            '--threads', '1',  # Usar apenas 1 thread para ser mais "gentil"
+            '--format', 'mp3',
+            '--bitrate', '320k'
         ]
         
-        # Executar download
-        process = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        print(f"Executando comando: {' '.join(cmd)}")
+        
+        # Executar download sem timeout (deixar rodar até terminar)
+        process = subprocess.run(cmd, capture_output=True, text=True)
         
         print(f"SpotDL return code: {process.returncode}")
         print(f"SpotDL stdout: {process.stdout}")

@@ -15,9 +15,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Instalar gunicorn para produção
-RUN pip install gunicorn
-
 # Atualizar yt-dlp para versão mais recente
 RUN pip install --upgrade yt-dlp
 
@@ -39,5 +36,5 @@ ENV HOST=0.0.0.0
 # Expor porta
 EXPOSE 5000
 
-# Comando de inicialização com gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "600", "app:app"]
+# Comando simples com Flask development server
+CMD ["python", "app.py"]
