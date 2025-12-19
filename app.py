@@ -60,30 +60,35 @@ def download_playlist_async(playlist_url):
         import time
         time.sleep(2)
         
-        # Comando spotDL mais simples e com timeout
+        # Testar conectividade primeiro
+        print("🔍 Testando SpotDL...")
+        version_cmd = ['spotdl', '--version']
+        version_result = subprocess.run(version_cmd, capture_output=True, text=True, timeout=10)
+        print(f"SpotDL version: {version_result.stdout.strip()}")
+        
+        # Comando mais simples sem parâmetros extras
         cmd = [
             'spotdl', 
             playlist_url, 
-            '--output', output_dir,
-            '--threads', '1',
-            '--format', 'mp3'
+            '--output', output_dir
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
         download_status['progress'] = 'Processando playlist...'
         
-        # Executar com timeout de 10 minutos
+        # Executar com timeout menor para teste
         try:
+            print(f"⏰ Iniciando SpotDL com timeout de 3 minutos...")
             process = subprocess.run(
                 cmd, 
                 capture_output=True, 
                 text=True, 
-                timeout=600,  # 10 minutos timeout
+                timeout=180,  # 3 minutos timeout para teste
                 cwd='/app'
             )
         except subprocess.TimeoutExpired:
-            print("❌ SpotDL timeout após 10 minutos")
-            raise Exception('Download demorou muito (timeout de 10 minutos). Tente uma playlist menor.')
+            print("❌ SpotDL timeout após 3 minutos - possível rate limiting")
+            raise Exception('SpotDL travou (timeout de 3 minutos). Isso geralmente indica rate limiting do YouTube. Tente novamente em alguns minutos.')
         
         print(f"✅ SpotDL finalizado com código: {process.returncode}")
         
