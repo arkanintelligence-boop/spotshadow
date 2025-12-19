@@ -4,6 +4,7 @@
 
 # Permitir apenas estes arquivos/pastas
 !public/
+!templates/
 !app.py
 !requirements.txt
 !README.md

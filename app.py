@@ -267,36 +267,49 @@ def index():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpotShadow - Spotify Playlist Downloader</title>
     <link rel="icon" href="/favicon.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Circular+Std:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(to bottom, #08a901, #053912); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: white; }
-        .container { background: linear-gradient(to bottom, rgba(8, 169, 1, 0.3), rgba(5, 57, 18, 0.3)); backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); max-width: 500px; width: 90%; text-align: center; }
-        .logo { margin-bottom: 10px; }
-        .logo img { border-radius: 10px; transition: transform 0.3s ease; max-width: 200px; height: auto; }
-        .logo img:hover { transform: scale(1.05); }
-        h1 { margin-bottom: 30px; font-size: 1.8em; font-weight: 300; }
-        input[type="url"] { width: 100%; padding: 15px; border: none; border-radius: 10px; background: rgba(255, 255, 255, 0.9); color: #333; font-size: 16px; outline: none; margin-bottom: 20px; }
-        .btn { background: #1db954; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 20px; }
-        .btn:hover { background: #1ed760; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(29, 185, 84, 0.4); }
-        .btn:disabled { background: #666; cursor: not-allowed; transform: none; box-shadow: none; }
-        input[type="url"]:focus { background: white; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); }
-        .status.downloading { background: rgba(29, 185, 84, 0.2); border: 1px solid #1db954; }
-        .status.completed { background: rgba(76, 175, 80, 0.2); border: 1px solid #4caf50; }
-        .status.error { background: rgba(244, 67, 54, 0.2); border: 1px solid #f44336; }
-        .status { margin-top: 20px; padding: 15px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); display: none; }
+        body { font-family: 'Circular Std', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #121212 0%, #1a1a1a 50%, #000000 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #ffffff; overflow-x: hidden; }
+        .background-pattern { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at 20% 80%, rgba(29, 185, 84, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(29, 185, 84, 0.05) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(29, 185, 84, 0.03) 0%, transparent 50%); z-index: -1; }
+        .container { background: rgba(24, 24, 24, 0.95); backdrop-filter: blur(20px); border-radius: 24px; padding: 48px 40px; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05); max-width: 480px; width: 90%; text-align: center; position: relative; overflow: hidden; }
+        .container::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(29, 185, 84, 0.5), transparent); }
+        .logo { margin-bottom: 24px; position: relative; }
+        .logo img { max-width: 120px; height: auto; filter: drop-shadow(0 8px 16px rgba(29, 185, 84, 0.3)); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .logo img:hover { transform: scale(1.05); filter: drop-shadow(0 12px 24px rgba(29, 185, 84, 0.4)); }
+        h1 { margin-bottom: 8px; font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #1db954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.5px; }
+        .subtitle { color: #b3b3b3; font-size: 16px; font-weight: 400; margin-bottom: 40px; letter-spacing: 0.1px; }
+        input[type="url"] { width: 100%; padding: 16px 20px; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 50px; background: rgba(255, 255, 255, 0.05); color: #ffffff; font-size: 16px; font-weight: 400; outline: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(10px); margin-bottom: 32px; }
+        input[type="url"]::placeholder { color: #b3b3b3; }
+        input[type="url"]:focus { border-color: #1db954; background: rgba(255, 255, 255, 0.08); box-shadow: 0 0 0 4px rgba(29, 185, 84, 0.1), 0 8px 32px rgba(29, 185, 84, 0.2); transform: translateY(-2px); }
+        .btn { background: linear-gradient(135deg, #1db954, #1ed760); color: white; border: none; padding: 16px 32px; border-radius: 50px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 100%; margin-bottom: 24px; position: relative; overflow: hidden; letter-spacing: 0.5px; text-transform: uppercase; }
+        .btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent); transition: left 0.5s; }
+        .btn:hover::before { left: 100%; }
+        .btn:hover { background: linear-gradient(135deg, #1ed760, #21e065); transform: translateY(-3px); box-shadow: 0 12px 24px rgba(29, 185, 84, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1); }
+        .btn:disabled { background: linear-gradient(135deg, #404040, #505050); cursor: not-allowed; transform: none; box-shadow: none; }
+        .status { margin-top: 32px; padding: 24px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); display: none; backdrop-filter: blur(10px); }
         .status.show { display: block; }
-        .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-top: 3px solid #1db954; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; }
+        .status.downloading { background: rgba(29, 185, 84, 0.1); border-color: rgba(29, 185, 84, 0.3); }
+        .status.completed { background: rgba(76, 175, 80, 0.1); border-color: rgba(76, 175, 80, 0.3); }
+        .status.error { background: rgba(244, 67, 54, 0.1); border-color: rgba(244, 67, 54, 0.3); }
+        .spinner { border: 3px solid rgba(255, 255, 255, 0.1); border-top: 3px solid #1db954; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 16px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .features { margin-top: 24px; display: flex; justify-content: space-around; gap: 16px; }
+        .feature { text-align: center; flex: 1; }
+        .feature-icon { font-size: 24px; margin-bottom: 8px; opacity: 0.8; }
+        .feature-text { font-size: 12px; color: #b3b3b3; font-weight: 500; }
     </style>
 </head>
 <body>
+    <div class="background-pattern"></div>
     <div class="container">
         <div class="logo">
             <img src="/logotipo-semfundo.png" alt="SpotShadow Logo" />
         </div>
-        <h1 style="font-size: 1.3em; margin-bottom: 30px;">Spotify Playlist Downloader</h1>
+        <h1>SpotShadow</h1>
+        <p class="subtitle">Baixe suas playlists favoritas do Spotify</p>
         <form id="downloadForm">
-            <input type="url" id="playlistUrl" placeholder="Cole aqui o link da playlist do Spotify..." required>
+            <input type="url" id="playlistUrl" placeholder="Cole o link da sua playlist aqui..." required>
             <button type="submit" class="btn" id="downloadBtn">Baixar Playlist</button>
         </form>
         <div id="status" class="status">
@@ -304,7 +317,12 @@ def index():
             <div id="progressText"></div>
             <button id="downloadZipBtn" class="btn" style="display: none;">📦 Baixar ZIP</button>
         </div>
-        <p><strong>Exemplo:</strong> https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</p>
+        <div class="features">
+            <div class="feature"><div class="feature-icon">🎵</div><div class="feature-text">Alta Qualidade</div></div>
+            <div class="feature"><div class="feature-icon">⚡</div><div class="feature-text">Super Rápido</div></div>
+            <div class="feature"><div class="feature-icon">🔒</div><div class="feature-text">100% Seguro</div></div>
+        </div>
+        <p style="margin-top: 32px; padding: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);"><strong style="color: #ffffff; font-size: 14px; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; display: block;">Exemplo de URL</strong><code style="background: rgba(29, 185, 84, 0.1); color: #1ed760; padding: 8px 12px; border-radius: 8px; font-family: monospace; font-size: 13px; word-break: break-all; display: inline-block; border: 1px solid rgba(29, 185, 84, 0.2);">https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</code></p>
     </div>
     <script>
         const form = document.getElementById('downloadForm');
