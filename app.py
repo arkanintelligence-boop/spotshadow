@@ -56,9 +56,10 @@ def download_playlist_async(playlist_url):
         
         download_status['progress'] = 'Conectando ao Spotify...'
         
-        # Aguardar um pouco para evitar rate limit
+        # Aguardar mais tempo para evitar rate limit
         import time
-        time.sleep(2)
+        print("⏳ Aguardando 10 segundos para evitar rate limiting...")
+        time.sleep(10)
         
         # Testar conectividade primeiro
         print("🔍 Testando SpotDL...")
@@ -66,11 +67,15 @@ def download_playlist_async(playlist_url):
         version_result = subprocess.run(version_cmd, capture_output=True, text=True, timeout=10)
         print(f"SpotDL version: {version_result.stdout.strip()}")
         
-        # Comando mais simples sem parâmetros extras
+        # Comando com configurações para contornar rate limiting
         cmd = [
             'spotdl', 
             playlist_url, 
-            '--output', output_dir
+            '--output', output_dir,
+            '--threads', '1',
+            '--audio-provider', 'youtube-music',  # Usar YouTube Music em vez do YouTube normal
+            '--bitrate', '128k',  # Bitrate menor para ser mais rápido
+            '--format', 'mp3'
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
@@ -104,7 +109,28 @@ def download_playlist_async(playlist_url):
             
             # Verificar tipos específicos de erro
             if 'rate limit' in error_output.lower() or 'too many requests' in error_output.lower():
-                raise Exception('YouTube está limitando as requisições. Tente novamente em alguns minutos.')
+                # Tentar novamente após aguardar
+                print("🔄 Rate limit detectado, tentando novamente em 30 segundos...")
+                time.sleep(30)
+                
+                # Segunda tentativa com configurações mais conservadoras
+                retry_cmd = [
+                    'spotdl', 
+                    playlist_url, 
+                    '--output', output_dir,
+                    '--threads', '1',
+                    '--audio-provider', 'youtube-music',
+                    '--bitrate', '96k'  # Bitrate ainda menor
+                ]
+                
+                print(f"🔄 Segunda tentativa: {' '.join(retry_cmd)}")
+                retry_process = subprocess.run(retry_cmd, capture_output=True, text=True, timeout=300)
+                
+                if retry_process.returncode == 0:
+                    print("✅ Segunda tentativa bem-sucedida!")
+                    process = retry_process  # Usar resultado da segunda tentativa
+                else:
+                    raise Exception('YouTube está limitando as requisições do seu servidor. Tente novamente em alguns minutos ou use uma VPN.')
             elif 'network' in error_output.lower() or 'connection' in error_output.lower():
                 raise Exception('Erro de conexão. Verifique sua internet e tente novamente.')
             else:
