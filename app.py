@@ -186,27 +186,34 @@ def download_playlist_async(playlist_url):
         # Verificar se a playlist é acessível tentando salvar metadados
         download_status['progress'] = 'Verificando playlist...'
         
-        # Comando spotDL simplificado
+        # Comando spotDL com configurações básicas
         cmd = [
             'spotdl',
-            'download',
             playlist_url,
-            '--output', output_dir,
-            '--format', 'mp3',
-            '--bitrate', '320k'
+            '--output', output_dir
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
+        print(f"📁 Diretório de saída: {output_dir}")
         
         # Executar download com timeout maior
         download_status['progress'] = 'Baixando músicas... (isso pode demorar alguns minutos)'
-        process = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # 10 minutos timeout
         
-        print(f"📊 SpotDL retornou código: {process.returncode}")
-        if process.stdout:
-            print(f"📝 SpotDL stdout: {process.stdout[:500]}...")
-        if process.stderr:
-            print(f"⚠️ SpotDL stderr: {process.stderr[:500]}...")
+        try:
+            process = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=os.getcwd())
+            
+            print(f"📊 SpotDL retornou código: {process.returncode}")
+            if process.stdout:
+                print(f"📝 SpotDL stdout: {process.stdout[:1000]}")
+            if process.stderr:
+                print(f"⚠️ SpotDL stderr: {process.stderr[:1000]}")
+                
+        except subprocess.TimeoutExpired as e:
+            print(f"⏰ Timeout no comando SpotDL: {e}")
+            raise
+        except Exception as e:
+            print(f"💥 Erro ao executar SpotDL: {e}")
+            raise
         
         # Verificar se houve erro
         if process.returncode != 0:
