@@ -35,7 +35,8 @@ download_status = {
     'downloaded_songs': 0,
     'zip_file': None,
     'error_message': '',
-    'created_at': None
+    'created_at': None,
+    'playlist_name': ''
 }
 
 # Lista de arquivos para limpeza automática
@@ -200,19 +201,53 @@ def download_playlist_async(playlist_url):
         print(f"📁 Diretório de saída: {output_dir}")
         
         # Executar download com timeout maior
-        download_status['progress'] = 'Baixando músicas... (isso pode demorar alguns minutos)'
+        download_status['progress'] = 'Baixando músicas...'
+        download_status['playlist_name'] = playlist_name
         
         try:
-            process = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=os.getcwd())  # 5 minutos timeout
+            # Executar com streaming para capturar progresso em tempo real
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                     text=True, cwd=os.getcwd(), bufsize=1, universal_newlines=True)
+            
+            stdout_lines = []
+            stderr_lines = []
+            
+            # Monitorar progresso em tempo real
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    stdout_lines.append(output.strip())
+                    # Extrair informações de progresso
+                    if 'Downloaded' in output or 'Downloading' in output:
+                        # Extrair nome da música atual
+                        if '"' in output:
+                            song_match = re.search(r'"([^"]+)"', output)
+                            if song_match:
+                                download_status['current_song'] = song_match.group(1)[:50] + "..." if len(song_match.group(1)) > 50 else song_match.group(1)
+                    
+                    # Contar músicas baixadas
+                    if 'Downloaded' in output:
+                        download_status['downloaded_songs'] = len([line for line in stdout_lines if 'Downloaded' in line])
+            
+            # Capturar stderr
+            stderr_output = process.stderr.read()
+            if stderr_output:
+                stderr_lines.append(stderr_output)
+            
+            process.wait(timeout=300)  # 5 minutos timeout
             
             print(f"📊 SpotDL retornou código: {process.returncode}")
-            if process.stdout:
-                print(f"📝 SpotDL stdout: {process.stdout[:1000]}")
-            if process.stderr:
-                print(f"⚠️ SpotDL stderr: {process.stderr[:1000]}")
+            if stdout_lines:
+                print(f"📝 SpotDL stdout: {' '.join(stdout_lines[:5])}")
+            if stderr_lines:
+                print(f"⚠️ SpotDL stderr: {' '.join(stderr_lines[:3])}")
                 
         except subprocess.TimeoutExpired as e:
             print(f"⏰ Timeout no comando SpotDL: {e}")
+            if process:
+                process.kill()
             raise
         except Exception as e:
             print(f"💥 Erro ao executar SpotDL: {e}")

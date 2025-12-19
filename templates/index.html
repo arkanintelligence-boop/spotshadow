@@ -47,6 +47,7 @@
                 0 0 0 1px rgba(255, 255, 255, 0.05);
             max-width: 480px;
             width: 90%;
+            min-height: 600px;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -187,13 +188,15 @@
         }
 
         .status {
-            margin-top: 32px;
-            padding: 24px;
+            margin-top: 24px;
+            padding: 20px;
             border-radius: 16px;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.08);
             display: none;
             backdrop-filter: blur(10px);
+            max-height: 200px;
+            overflow-y: auto;
         }
 
         .status.show {
@@ -228,10 +231,38 @@
         }
 
         .progress {
-            margin: 16px 0;
-            font-size: 14px;
+            margin: 12px 0;
+            font-size: 13px;
             color: #b3b3b3;
-            line-height: 1.5;
+            line-height: 1.4;
+            text-align: left;
+        }
+
+        .progress-header {
+            font-size: 14px;
+            color: #1db954;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .current-song {
+            background: rgba(29, 185, 84, 0.1);
+            border: 1px solid rgba(29, 185, 84, 0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin: 4px 0;
+            font-size: 12px;
+            color: #1ed760;
+            text-align: center;
+        }
+
+        .progress-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 12px;
+            color: #888;
         }
 
         .download-btn {
@@ -446,19 +477,29 @@
                     const response = await fetch('/status');
                     const data = await response.json();
 
-                    // Atualizar texto de progresso
-                    let progressMsg = data.progress;
+                    // Atualizar progresso com layout melhorado
+                    let progressHTML = '';
                     
-                    // Adicionar informações extras se disponível
-                    if (data.total_songs > 0) {
-                        progressMsg += ` (${data.downloaded_songs}/${data.total_songs})`;
+                    if (data.status === 'downloading') {
+                        progressHTML += '<div class="progress-header">🎵 Baixando Playlist</div>';
+                        
+                        if (data.total_songs > 0) {
+                            progressHTML += `<div class="progress-stats">
+                                <span>Progresso: ${data.downloaded_songs || 0}/${data.total_songs}</span>
+                                <span>${Math.round(((data.downloaded_songs || 0) / data.total_songs) * 100)}%</span>
+                            </div>`;
+                        }
+                        
+                        if (data.current_song) {
+                            progressHTML += `<div class="current-song">🎶 ${data.current_song}</div>`;
+                        }
+                        
+                        progressHTML += `<div style="margin-top: 8px; font-size: 12px; color: #888; text-align: center;">${data.progress}</div>`;
+                    } else {
+                        progressHTML = data.progress;
                     }
                     
-                    if (data.current_song) {
-                        progressMsg += `\n🎵 ${data.current_song}`;
-                    }
-                    
-                    progressText.innerHTML = progressMsg.replace(/\n/g, '<br>');
+                    progressText.innerHTML = progressHTML;
 
                     if (data.status === 'completed') {
                         clearInterval(statusInterval);
