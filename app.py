@@ -114,26 +114,14 @@ def add_file_to_cleanup(file_path):
     })
 
 def install_spotdl():
-    """Instala o spotDL se não estiver instalado"""
+    """Verifica se o spotDL está disponível"""
     try:
-        result = subprocess.run(['spotdl', '--version'], check=True, capture_output=True, text=True)
+        result = subprocess.run(['spotdl', '--version'], check=True, capture_output=True, text=True, timeout=10)
         print(f"✅ SpotDL encontrado: {result.stdout.strip()}")
         return True
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"⚠️ SpotDL não encontrado: {e}")
-        try:
-            print("🔄 Instalando SpotDL...")
-            result = subprocess.run([sys.executable, '-m', 'pip', 'install', 'spotdl==4.2.5'], 
-                                  check=True, capture_output=True, text=True)
-            print(f"✅ SpotDL instalado: {result.stdout}")
-            
-            # Verificar se instalou corretamente
-            result = subprocess.run(['spotdl', '--version'], check=True, capture_output=True, text=True)
-            print(f"✅ SpotDL verificado: {result.stdout.strip()}")
-            return True
-        except Exception as install_error:
-            print(f"❌ Erro ao instalar SpotDL: {install_error}")
-            return False
+    except Exception as e:
+        print(f"❌ SpotDL não disponível: {e}")
+        return False
 
 def get_playlist_name(playlist_url):
     """Obtém o nome da playlist usando spotDL"""
