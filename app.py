@@ -266,13 +266,13 @@ def index():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpotShadow - Spotify Playlist Downloader</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+    <link rel="icon" href="/favicon.png" type="image/png">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(to bottom, #08a901, #053912); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: white; }
         .container { background: linear-gradient(to bottom, rgba(8, 169, 1, 0.3), rgba(5, 57, 18, 0.3)); backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); max-width: 500px; width: 90%; text-align: center; }
         .logo { margin-bottom: 10px; }
-        .logo img { border-radius: 10px; transition: transform 0.3s ease; }
+        .logo img { border-radius: 10px; transition: transform 0.3s ease; max-width: 200px; height: auto; }
         .logo img:hover { transform: scale(1.05); }
         h1 { margin-bottom: 30px; font-size: 1.8em; font-weight: 300; }
         input[type="url"] { width: 100%; padding: 15px; border: none; border-radius: 10px; background: rgba(255, 255, 255, 0.9); color: #333; font-size: 16px; outline: none; margin-bottom: 20px; }
@@ -292,8 +292,7 @@ def index():
 <body>
     <div class="container">
         <div class="logo">
-            <div style="font-size: 4em; margin-bottom: 10px; background: linear-gradient(45deg, #1db954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🎵</div>
-            <div style="font-size: 1.5em; font-weight: bold; color: #1db954; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); margin-bottom: 10px;">SpotShadow</div>
+            <img src="/logotipo-semfundo.png" alt="SpotShadow Logo" />
         </div>
         <h1 style="font-size: 1.3em; margin-bottom: 30px;">Spotify Playlist Downloader</h1>
         <form id="downloadForm">
