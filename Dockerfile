@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Instalar gunicorn para produção
 RUN pip install gunicorn
 
+# Atualizar yt-dlp para versão mais recente
+RUN pip install --upgrade yt-dlp
+
 # Copiar todo o código da aplicação
 COPY . .
 
@@ -25,8 +28,8 @@ COPY . .
 RUN mkdir -p downloads templates && \
     chmod 777 downloads
 
-# Testar se SpotDL funciona
-RUN spotdl --version
+# Testar se SpotDL e yt-dlp funcionam
+RUN spotdl --version && yt-dlp --version
 
 # Definir variáveis de ambiente
 ENV PYTHONUNBUFFERED=1
