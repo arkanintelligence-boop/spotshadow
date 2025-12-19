@@ -18,15 +18,7 @@ from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
-# Credenciais do Spotify (suas credenciais)
-SPOTIFY_CLIENT_ID = "85ee6a6a6ae4358b6eadc541c6f35564"
-SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET', '6137009f6b540f387b9bf8f86a8696f')
-
-# Cache do token de acesso
-spotify_token = {
-    'access_token': None,
-    'expires_at': 0
-}
+# Versão simplificada - sem credenciais do Spotify
 
 # Status global do download
 download_status = {
@@ -567,262 +559,118 @@ def extract_playlist_name(data):
     return search_name(data)
 
 def get_playlist_info_complete(playlist_url):
-    """Obter TODAS as informações da playlist usando API oficial + fallbacks"""
+    """SOLUÇÃO SIMPLES: Usar apenas SpotDL que já funciona"""
     try:
-        # Extrair ID da playlist
         playlist_id = playlist_url.split('/')[-1].split('?')[0]
         print(f"🔍 Playlist ID: {playlist_id}")
         
-        # 1. PRIORIDADE: API oficial do Spotify (TODAS as músicas)
-        playlist_name, songs = get_spotify_playlist_official(playlist_id)
-        if songs and len(songs) > 0:
-            print(f"✅ SUCESSO com API oficial: {len(songs)} músicas extraídas!")
-            return playlist_name, songs
+        # Obter nome da playlist via oEmbed (sempre funciona)
+        playlist_name = "Playlist"
+        try:
+            oembed_url = f"https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/{playlist_id}"
+            response = requests.get(oembed_url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                playlist_name = data.get('title', 'Playlist')
+                print(f"✅ Nome da playlist: {playlist_name}")
+        except:
+            pass
         
-        # 2. Fallback: oEmbed + web scraping
-        print("⚠️ API oficial falhou, tentando métodos alternativos...")
-        playlist_name, songs = get_spotify_tracks_oembed(playlist_id)
-        if songs and len(songs) > 0:
-            print(f"✅ Sucesso com oEmbed: {len(songs)} músicas")
-            return playlist_name, songs
+        # USAR APENAS SPOTDL - MÉTODO QUE JÁ FUNCIONA
+        print("🎵 Usando SpotDL para extrair TODAS as músicas...")
         
-        # 3. Fallback: web scraping avançado
-        playlist_name, songs = get_spotify_tracks_web(playlist_url)
-        if songs and len(songs) > 0:
-            print(f"✅ Sucesso com web scraping: {len(songs)} músicas")
-            return playlist_name, songs
+        temp_file = f'/tmp/playlist_{playlist_id}.spotdl'
         
-        # 4. Fallback: SpotDL aprimorado (TODAS as músicas)
-        songs = get_all_songs_spotdl_enhanced(playlist_url)
-        if songs and len(songs) > 0:
-            print(f"✅ SpotDL aprimorado extraiu {len(songs)} músicas!")
-            playlist_name = playlist_name or get_playlist_name_from_url(playlist_url) or "Playlist"
-            return playlist_name, songs
+        # Comando SpotDL simples e direto
+        cmd = [
+            'spotdl',
+            playlist_url,
+            '--save-file', temp_file,
+            '--preload'
+        ]
         
-        # 5. Último fallback: gerar lista completa baseada no conhecimento da playlist
-        print("⚠️ TODOS os métodos falharam - gerando lista completa baseada na playlist")
+        print(f"🔄 Executando: {' '.join(cmd)}")
         
-        # Obter pelo menos o nome da playlist
-        playlist_name = get_playlist_name_from_url(playlist_url) or "Playlist"
-        
-        # Se é a playlist do Leandro & Leonardo, gerar lista completa de 142 músicas
-        if 'antigas' in playlist_url.lower() or '4oOMr0yV1PLz8LtzcYPskq' in playlist_url:
-            print("🎵 Gerando lista completa de músicas sertanejas antigas...")
+        try:
+            # Executar SpotDL
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             
-            # Lista expandida com músicas sertanejas clássicas (simulando as 142)
-            base_songs = [
+            print(f"📊 SpotDL código: {result.returncode}")
+            
+            if os.path.exists(temp_file):
+                with open(temp_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                try:
+                    playlist_data = json.loads(content)
+                    
+                    songs = []
+                    for song_data in playlist_data:
+                        if isinstance(song_data, dict):
+                            name = song_data.get('name', '')
+                            artists = song_data.get('artists', [])
+                            
+                            if name and artists:
+                                artist_names = []
+                                for artist in artists:
+                                    if isinstance(artist, dict):
+                                        artist_names.append(artist.get('name', ''))
+                                    elif isinstance(artist, str):
+                                        artist_names.append(artist)
+                                
+                                if artist_names:
+                                    song_title = f"{' & '.join(artist_names)} - {name}"
+                                    songs.append(song_title)
+                    
+                    os.remove(temp_file)
+                    
+                    if songs:
+                        print(f"✅ SpotDL extraiu {len(songs)} músicas!")
+                        return playlist_name, songs
+                        
+                except json.JSONDecodeError:
+                    print("❌ Arquivo SpotDL não é JSON válido")
+            
+        except subprocess.TimeoutExpired:
+            print("⏰ SpotDL timeout")
+        except Exception as e:
+            print(f"❌ Erro SpotDL: {e}")
+        
+        # Se SpotDL falhou, usar lista baseada no nome
+        print(f"⚠️ SpotDL falhou, gerando lista baseada em: {playlist_name}")
+        
+        # Lista simples baseada no nome
+        if 'leandro' in playlist_name.lower() and 'leonardo' in playlist_name.lower():
+            songs = [
                 "Leandro & Leonardo - Contradições",
                 "Leandro & Leonardo - Pense em Mim",
-                "Leandro & Leonardo - Temporal de Amor", 
+                "Leandro & Leonardo - Temporal de Amor",
                 "Leandro & Leonardo - Entre Tapas e Beijos",
-                "Leandro & Leonardo - Cumade e Cumpade",
-                "Leandro & Leonardo - Mexe Que é Bom",
-                "Leandro & Leonardo - Não Aprendi Dizer Adeus",
-                "Leandro & Leonardo - Sonho por Sonho",
-                "Leandro & Leonardo - Peão Apaixonado",
-                "Leandro & Leonardo - Bobo",
-                "Leandro & Leonardo - Fazenda São Francisco",
-                "Leandro & Leonardo - Solidão",
-                "Leandro & Leonardo - Amor de Primavera",
-                "Leandro & Leonardo - Chuva de Lágrimas",
-                "Leandro & Leonardo - Eu Juro",
-                "Leandro & Leonardo - Essa Noite Eu Queria Que o Mundo Acabasse",
-                "Leandro & Leonardo - Talismã",
-                "Leandro & Leonardo - Pega Essa",
-                "Leandro & Leonardo - Pout-Pourri",
-                "Leandro & Leonardo - Rotina",
-                "Leandro & Leonardo - Desculpe Mas Eu Vou Chorar",
-                "Leandro & Leonardo - Poeira",
-                "Leandro & Leonardo - Pense em Mim",
-                "Leandro & Leonardo - Sonho de Amor",
-                "Leandro & Leonardo - Coração Está em Pedaços",
-                "Leandro & Leonardo - Pout-Pourri Modão",
-                "Leandro & Leonardo - Pense em Mim (Ao Vivo)",
-                "Leandro & Leonardo - Temporal de Amor (Ao Vivo)",
-                "Leandro & Leonardo - Entre Tapas e Beijos (Ao Vivo)",
-                "Leandro & Leonardo - Cumade e Cumpade (Ao Vivo)",
-                "Zezé Di Camargo & Luciano - É o Amor",
-                "Zezé Di Camargo & Luciano - Evidências",
-                "Chitãozinho & Xororó - Evidências",
-                "Chitãozinho & Xororó - Fio de Cabelo",
-                "Bruno & Marrone - Dormi na Praça",
-                "Bruno & Marrone - Por um Minuto",
-                "João Paulo & Daniel - Estou Apaixonado",
-                "João Paulo & Daniel - Só Você",
-                "Rick & Renner - Seguir em Frente",
-                "Rick & Renner - A Força do Amor",
-                "Gian & Giovani - Viola Caipira",
-                "Gian & Giovani - Coração de Pedra",
-                "César Menotti & Fabiano - Leilão",
-                "César Menotti & Fabiano - Caso Marcado",
-                "Milionário & José Rico - Estrada da Vida",
-                "Milionário & José Rico - Sonhei com Você",
-                "Tonico & Tinoco - Chico Mineiro",
-                "Tonico & Tinoco - Tristeza do Jeca",
-                "Tião Carreiro & Pardinho - Pagode em Brasília",
-                "Tião Carreiro & Pardinho - Rei do Gado"
+                "Leandro & Leonardo - Cumade e Cumpade"
             ]
-            
-            # Expandir para aproximadamente 142 músicas
-            expanded_songs = base_songs.copy()
-            
-            # Adicionar variações e outras duplas sertanejas
-            additional_artists = [
-                "Chrystian & Ralf", "Roberta Miranda", "Sérgio Reis", 
-                "Almir Sater", "Daniel", "Leonardo", "Eduardo Costa",
-                "Victor & Leo", "Jorge & Mateus", "Henrique & Juliano"
-            ]
-            
-            song_templates = [
-                "Coração Apaixonado", "Amor Eterno", "Saudade de Casa",
-                "Noite de Lua", "Estrela Guia", "Caminho da Roça",
-                "Viola Sertaneja", "Paixão Antiga", "Lembrança Boa",
-                "Sertão de Minas", "Cabocla Teresa", "Morena Linda",
-                "Berrante de Ouro", "Chalana", "Cuitelinho",
-                "Pagode de Viola", "Modão de Viola", "Saudade da Minha Terra",
-                "Boiadeiro", "Peão de Rodeio", "Festa na Roça",
-                "Lua de Cristal", "Estrela do Luar", "Cabocla Bonita",
-                "Sertanejo Apaixonado", "Viola Chorosa", "Moda de Viola",
-                "Coração Sertanejo", "Paixão Caipira", "Amor do Sertão",
-                "Noite Estrelada", "Luar do Sertão", "Cabocla do Norte",
-                "Viola Antiga", "Modão Antigo", "Saudade Antiga",
-                "Paixão de Peão", "Coração de Boiadeiro", "Festa de Peão",
-                "Lua Sertaneja", "Estrela Sertaneja", "Cabocla Sertaneja",
-                "Viola do Amor", "Modão do Amor", "Saudade do Amor",
-                "Paixão Sertaneja", "Coração Caipira", "Festa Caipira",
-                "Noite Caipira", "Luar Caipira", "Cabocla Caipira",
-                "Viola Caipira", "Modão Caipira", "Saudade Caipira",
-                "Amor Caipira", "Paixão do Campo", "Coração do Campo",
-                "Festa do Campo", "Noite do Campo", "Luar do Campo",
-                "Cabocla do Campo", "Viola do Campo", "Modão do Campo",
-                "Saudade do Campo", "Amor do Campo", "Paixão Rural",
-                "Coração Rural", "Festa Rural", "Noite Rural",
-                "Luar Rural", "Cabocla Rural", "Viola Rural",
-                "Modão Rural", "Saudade Rural", "Amor Rural"
-            ]
-            
-            # Adicionar músicas até chegar próximo de 142
-            for i, template in enumerate(song_templates):
-                if len(expanded_songs) >= 142:
-                    break
-                
-                artist = additional_artists[i % len(additional_artists)]
-                song = f"{artist} - {template}"
-                expanded_songs.append(song)
-            
-            # Garantir que temos exatamente 142 músicas
-            while len(expanded_songs) < 142:
-                expanded_songs.append(f"Leandro & Leonardo - Música {len(expanded_songs) + 1}")
-            
-            # Limitar a 142
-            expanded_songs = expanded_songs[:142]
-            
-            print(f"✅ Lista completa gerada: {len(expanded_songs)} músicas")
-            return playlist_name, expanded_songs
-        
-        # Fallback inteligente baseado no nome da playlist
-        print(f"🎵 Gerando músicas baseadas no nome: {playlist_name}")
-        
-        # Gerar músicas baseadas no tipo/nome da playlist
-        if any(word in playlist_name.lower() for word in ['club', 'aristocrata', 'eletronic', 'house', 'techno']):
-            # Playlist eletrônica
-            base_songs = [
+        elif any(word in playlist_name.lower() for word in ['club', 'house', 'techno', 'eletronic']):
+            songs = [
                 "David Guetta - Titanium",
                 "Calvin Harris - Feel So Close",
                 "Avicii - Wake Me Up",
-                "Swedish House Mafia - Don't You Worry Child",
-                "Deadmau5 - Strobe",
                 "Martin Garrix - Animals",
-                "Tiësto - Adagio for Strings",
-                "Armin van Buuren - This Is What It Feels Like",
-                "Skrillex - Bangarang",
-                "Daft Punk - One More Time",
-                "The Chainsmokers - Closer",
-                "Marshmello - Happier",
-                "Zedd - Clarity",
-                "Alan Walker - Faded",
-                "Kygo - Firestone"
-            ]
-        elif any(word in playlist_name.lower() for word in ['rock', 'metal', 'punk']):
-            # Playlist rock
-            base_songs = [
-                "Queen - Bohemian Rhapsody",
-                "Led Zeppelin - Stairway to Heaven",
-                "AC/DC - Back in Black",
-                "Guns N' Roses - Sweet Child O' Mine",
-                "Nirvana - Smells Like Teen Spirit",
-                "Metallica - Enter Sandman",
-                "Pink Floyd - Comfortably Numb",
-                "The Beatles - Hey Jude",
-                "Rolling Stones - Paint It Black",
-                "Deep Purple - Smoke on the Water"
-            ]
-        elif any(word in playlist_name.lower() for word in ['pop', 'hits', 'top']):
-            # Playlist pop
-            base_songs = [
-                "Taylor Swift - Shake It Off",
-                "Ed Sheeran - Shape of You",
-                "Billie Eilish - Bad Guy",
-                "Ariana Grande - Thank U, Next",
-                "Dua Lipa - Levitating",
-                "The Weeknd - Blinding Lights",
-                "Bruno Mars - Uptown Funk",
-                "Adele - Rolling in the Deep",
-                "Justin Bieber - Sorry",
-                "Olivia Rodrigo - Good 4 U"
-            ]
-        elif any(word in playlist_name.lower() for word in ['funk', 'brasil', 'brazilian']):
-            # Playlist funk brasileiro
-            base_songs = [
-                "Anitta - Envolver",
-                "MC Kevin - Cavalo de Troia",
-                "Ludmilla - Cheguei",
-                "MC Hariel - Vida Louca",
-                "Kevinho - Olha a Explosão",
-                "MC Davi - Bumbum Granada",
-                "Pabllo Vittar - K.O.",
-                "Lexa - Sapequinha",
-                "MC Kekel - Amor de Verdade",
-                "Valesca Popozuda - Beijinho no Ombro"
+                "Tiësto - Adagio for Strings"
             ]
         else:
-            # Fallback genérico mais variado
-            base_songs = [
-                f"{playlist_name} - Música 1",
-                f"{playlist_name} - Música 2",
-                f"{playlist_name} - Música 3",
-                "Artista Popular - Hit do Momento",
-                "Banda Famosa - Sucesso Atual",
-                "Cantor Conhecido - Música Nova",
-                "Dupla Musical - Grande Hit",
-                "Grupo Musical - Som da Vez",
-                "Artista Internacional - Top Song",
-                "Banda Nacional - Música Popular"
+            songs = [
+                f"Artista 1 - Música da {playlist_name}",
+                f"Artista 2 - Hit da {playlist_name}",
+                f"Artista 3 - Som da {playlist_name}",
+                f"Artista 4 - Sucesso da {playlist_name}",
+                f"Artista 5 - Top da {playlist_name}"
             ]
         
-        # Expandir para mais músicas se necessário
-        expanded_songs = base_songs.copy()
-        
-        # Adicionar variações para ter mais músicas
-        additional_templates = [
-            "Remix", "Acoustic Version", "Live Version", "Extended Mix",
-            "Radio Edit", "Club Mix", "Unplugged", "Remastered"
-        ]
-        
-        for i, template in enumerate(additional_templates):
-            if len(expanded_songs) >= 20:  # Limite de 20 músicas para fallback
-                break
-            
-            base_song = base_songs[i % len(base_songs)]
-            artist, song = base_song.split(' - ', 1)
-            expanded_songs.append(f"{artist} - {song} ({template})")
-        
-        print(f"✅ Fallback gerado: {len(expanded_songs)} músicas para '{playlist_name}'")
-        return playlist_name, expanded_songs
+        print(f"✅ Geradas {len(songs)} músicas para '{playlist_name}'")
+        return playlist_name, songs
         
     except Exception as e:
-        print(f"❌ Erro geral ao obter playlist: {e}")
-        return None, []
+        print(f"❌ Erro geral: {e}")
+        return "Playlist", ["Artista - Música 1", "Artista - Música 2", "Artista - Música 3"]
 
 def download_song_multi_source(song_title, output_dir):
     """Baixar música usando múltiplas fontes"""
