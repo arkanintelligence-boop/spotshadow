@@ -7,14 +7,10 @@
 !templates/
 !app.py
 !requirements.txt
-!runtime.txt
 !Procfile
-!nixpacks.toml
+!Dockerfile
 !README.md
 !.gitignore
-!Dockerfile
-!.dockerignore
-!downloads/
 !favicon.png
 !logotipo-semfundo.png
 !logotipo.png
