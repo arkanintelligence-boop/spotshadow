@@ -54,44 +54,73 @@ def download_playlist_async(playlist_url):
         
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        download_status['progress'] = 'Baixando músicas...'
+        download_status['progress'] = 'Conectando ao Spotify...'
         
         # Aguardar um pouco para evitar rate limit
         import time
-        time.sleep(5)
+        time.sleep(2)
         
-        # Comando spotDL com configurações para evitar rate limit
+        # Comando spotDL mais simples e com timeout
         cmd = [
             'spotdl', 
             playlist_url, 
             '--output', output_dir,
-            '--threads', '1',  # Usar apenas 1 thread para ser mais "gentil"
-            '--format', 'mp3',
-            '--bitrate', '320k'
+            '--threads', '1',
+            '--format', 'mp3'
         ]
         
-        print(f"Executando comando: {' '.join(cmd)}")
+        print(f"🎵 Executando comando: {' '.join(cmd)}")
+        download_status['progress'] = 'Processando playlist...'
         
-        # Executar download sem timeout (deixar rodar até terminar)
-        process = subprocess.run(cmd, capture_output=True, text=True)
+        # Executar com timeout de 10 minutos
+        try:
+            process = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                timeout=600,  # 10 minutos timeout
+                cwd='/app'
+            )
+        except subprocess.TimeoutExpired:
+            print("❌ SpotDL timeout após 10 minutos")
+            raise Exception('Download demorou muito (timeout de 10 minutos). Tente uma playlist menor.')
         
-        print(f"SpotDL return code: {process.returncode}")
-        print(f"SpotDL stdout: {process.stdout}")
-        print(f"SpotDL stderr: {process.stderr}")
+        print(f"✅ SpotDL finalizado com código: {process.returncode}")
         
+        # Log detalhado da saída
+        if process.stdout:
+            print(f"📝 SpotDL stdout:\n{process.stdout}")
+        if process.stderr:
+            print(f"⚠️ SpotDL stderr:\n{process.stderr}")
+        
+        # Verificar se houve erro
         if process.returncode != 0:
-            error_msg = process.stderr or process.stdout or 'Erro desconhecido no SpotDL'
-            raise Exception(f'Erro no SpotDL: {error_msg[:200]}')
+            error_output = process.stderr or process.stdout or 'Erro desconhecido'
+            
+            # Verificar tipos específicos de erro
+            if 'rate limit' in error_output.lower() or 'too many requests' in error_output.lower():
+                raise Exception('YouTube está limitando as requisições. Tente novamente em alguns minutos.')
+            elif 'network' in error_output.lower() or 'connection' in error_output.lower():
+                raise Exception('Erro de conexão. Verifique sua internet e tente novamente.')
+            else:
+                raise Exception(f'Erro no SpotDL: {error_output[:300]}')
+        
+        download_status['progress'] = 'Verificando arquivos baixados...'
         
         # Verificar arquivos baixados
         mp3_files = list(Path(output_dir).rglob('*.mp3'))
-        print(f"Arquivos encontrados: {len(mp3_files)}")
+        print(f"🎶 Arquivos MP3 encontrados: {len(mp3_files)}")
         
         if not mp3_files:
-            # Verificar se há outros tipos de arquivo
+            # Verificar todos os arquivos para debug
             all_files = list(Path(output_dir).rglob('*'))
-            print(f"Todos os arquivos: {[f.name for f in all_files]}")
-            raise Exception(f'Nenhuma música MP3 foi baixada. Arquivos encontrados: {len(all_files)}')
+            file_names = [f.name for f in all_files if f.is_file()]
+            print(f"📁 Todos os arquivos encontrados: {file_names}")
+            
+            if not file_names:
+                raise Exception('Nenhum arquivo foi baixado. Verifique se a playlist é pública.')
+            else:
+                raise Exception(f'Nenhuma música MP3 foi baixada. Arquivos encontrados: {", ".join(file_names[:5])}')
         
         download_status['progress'] = f'Criando ZIP com {len(mp3_files)} músicas...'
         
@@ -99,19 +128,26 @@ def download_playlist_async(playlist_url):
         zip_name = f"downloads/{playlist_name}.zip"
         with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file_path in mp3_files:
-                zipf.write(file_path, file_path.name)
+                # Usar nome mais limpo para o arquivo no ZIP
+                clean_name = file_path.name.replace('_', ' ')
+                zipf.write(file_path, clean_name)
         
         # Limpar pasta temporária
         shutil.rmtree(output_dir)
         
         download_status['status'] = 'completed'
-        download_status['progress'] = f'Download concluído! {len(mp3_files)} músicas.'
+        download_status['progress'] = f'✅ Download concluído! {len(mp3_files)} músicas prontas.'
         download_status['zip_file'] = zip_name
         
+        print(f"🎉 Download concluído com sucesso: {len(mp3_files)} músicas")
+        
     except Exception as e:
+        error_msg = str(e)
+        print(f"💥 Erro no download: {error_msg}")
+        
         download_status['status'] = 'error'
-        download_status['error_message'] = str(e)
-        download_status['progress'] = f'Erro: {str(e)}'
+        download_status['error_message'] = error_msg
+        download_status['progress'] = f'❌ Erro: {error_msg}'
 
 @app.route('/')
 def index():
