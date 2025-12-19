@@ -186,11 +186,16 @@ def download_playlist_async(playlist_url):
         # Verificar se a playlist é acessível tentando salvar metadados
         download_status['progress'] = 'Verificando playlist...'
         
-        # Comando spotDL com configurações básicas
+        # Comando spotDL otimizado para velocidade máxima
         cmd = [
             'spotdl',
             playlist_url,
-            '--output', output_dir
+            '--output', output_dir,
+            '--threads', '16',          # 16 downloads simultâneos (MUITO MAIS RÁPIDO)
+            '--bitrate', '192k',        # Boa qualidade mas rápido
+            '--format', 'mp3',
+            '--audio-provider', 'youtube-music',  # Fonte mais rápida
+            '--simple-tui'
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
@@ -200,7 +205,7 @@ def download_playlist_async(playlist_url):
         download_status['progress'] = 'Baixando músicas... (isso pode demorar alguns minutos)'
         
         try:
-            process = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=os.getcwd())
+            process = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=os.getcwd())  # 5 minutos timeout
             
             print(f"📊 SpotDL retornou código: {process.returncode}")
             if process.stdout:
@@ -241,9 +246,9 @@ def download_playlist_async(playlist_url):
         
         download_status['progress'] = f'Criando arquivo ZIP com {len(mp3_files)} músicas...'
         
-        # Criar ZIP com nome da playlist
+        # Criar ZIP otimizado (compressão mais rápida)
         zip_name = f"downloads/{playlist_name}.zip"
-        with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_STORED, compresslevel=1) as zipf:  # Compressão mínima = mais rápido
             for file_path in mp3_files:
                 arcname = file_path.name  # Apenas o nome do arquivo
                 zipf.write(file_path, arcname)
