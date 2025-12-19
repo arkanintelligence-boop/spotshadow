@@ -11,6 +11,9 @@
 !Dockerfile
 !.dockerignore
 !downloads/
+!favicon.png
+!logotipo-semfundo.png
+!logotipo.png
 
 # Arquivos temporários e downloads
 downloads/
