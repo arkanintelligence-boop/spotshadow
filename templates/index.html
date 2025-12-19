@@ -427,6 +427,8 @@
             e.preventDefault();
             
             const url = playlistUrl.value.trim();
+            console.log('🎵 SpotShadow: Iniciando download da playlist:', url);
+            
             if (!url) return;
 
             // Resetar interface
@@ -439,13 +441,16 @@
 
             try {
                 // Obter token de segurança
+                console.log('🔑 Obtendo token de segurança...');
                 const tokenResponse = await fetch('/get-token');
                 const tokenData = await tokenResponse.json();
+                console.log('🔑 Token obtido:', tokenData);
                 
                 if (!tokenResponse.ok) {
                     throw new Error('Erro ao obter token de segurança');
                 }
 
+                console.log('📡 Enviando requisição de download...');
                 const response = await fetch('/download', {
                     method: 'POST',
                     headers: {
@@ -458,24 +463,30 @@
                 });
 
                 const data = await response.json();
+                console.log('📡 Resposta do servidor:', data);
 
                 if (!response.ok) {
+                    console.error('❌ Erro na resposta:', data);
                     throw new Error(data.error || 'Erro no servidor');
                 }
 
+                console.log('✅ Download iniciado com sucesso');
                 // Iniciar polling do status
                 startStatusPolling();
 
             } catch (error) {
+                console.error('💥 Erro no download:', error);
                 showError(error.message);
             }
         });
 
         function startStatusPolling() {
+            console.log('📊 Iniciando monitoramento de status...');
             statusInterval = setInterval(async () => {
                 try {
                     const response = await fetch('/status');
                     const data = await response.json();
+                    console.log('📊 Status atual:', data);
 
                     // Atualizar progresso com layout melhorado
                     let progressHTML = '';
@@ -516,6 +527,7 @@
         }
 
         function showCompleted() {
+            console.log('🎉 Download concluído com sucesso!');
             status.className = 'status show completed';
             spinner.style.display = 'none';
             progressText.textContent = '✅ Download concluído!';
@@ -524,6 +536,7 @@
         }
 
         function showError(message) {
+            console.error('❌ Erro no download:', message);
             status.className = 'status show error';
             spinner.style.display = 'none';
             progressText.textContent = `❌ ${message}`;
