@@ -153,17 +153,29 @@ def get_playlist_info_public(playlist_url):
                         if matches:
                             print(f"✅ Padrão encontrado: {len(matches)} matches")
                             
-                            # Se encontrou título, pelo menos sabemos que a playlist existe
+                            # Se encontrou título, tentar extrair músicas reais
                             if 'title' in pattern.lower():
                                 title = matches[0] if matches else 'Playlist'
                                 print(f"🎵 Título encontrado: {title}")
-                                
-                                # Retornar músicas de exemplo para teste
-                                return [
-                                    "The Weeknd - Pray For Me",
-                                    "The Weeknd - I Was Never There", 
-                                    "Lil Peep - Falling Down"
-                                ]
+                            
+                            # Tentar extrair músicas do conteúdo
+                            music_patterns = [
+                                r'"name":"([^"]+)"[^}]*"artists":\[{"name":"([^"]+)"',
+                                r'"track":{"name":"([^"]+)"[^}]*"artists":\[{"name":"([^"]+)"'
+                            ]
+                            
+                            extracted_songs = []
+                            for music_pattern in music_patterns:
+                                music_matches = re.findall(music_pattern, content)
+                                for match in music_matches:
+                                    if len(match) == 2 and len(match[0]) > 2 and len(match[1]) > 2:
+                                        song_title = f"{match[1]} - {match[0]}"
+                                        if song_title not in extracted_songs:
+                                            extracted_songs.append(song_title)
+                            
+                            if extracted_songs:
+                                print(f"🎶 Extraídas {len(extracted_songs)} músicas reais da playlist")
+                                return extracted_songs[:15]  # Limitar a 15 músicas
                     
                     # Se chegou aqui, pelo menos a playlist existe
                     print("⚠️ Playlist encontrada mas não conseguiu extrair músicas")
