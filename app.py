@@ -196,9 +196,8 @@ def get_all_songs_spotdl_enhanced(playlist_url):
             'spotdl',
             playlist_url,
             '--save-file', temp_file,
-            '--preload',
-            '--print-errors',
-            '--threads', '1'
+            '--print-errors'
+            # Removido --preload para ser mais rápido
         ]
         
         print(f"🎵 Executando: {' '.join(list_cmd)}")
@@ -607,19 +606,30 @@ def get_playlist_info_complete(playlist_url):
         temp_dir = tempfile.gettempdir()
         temp_file = os.path.join(temp_dir, f'playlist_{playlist_id}.spotdl')
         
-        # Comando SpotDL simples e direto
+        # Comando SpotDL otimizado (sem --preload para ser mais rápido)
         cmd = [
             'spotdl',
             playlist_url,
-            '--save-file', temp_file,
-            '--preload'
+            '--save-file', temp_file
         ]
         
         print(f"🔄 Executando: {' '.join(cmd)}")
         
         try:
+            # Timeout ajustado para playlists grandes (5 minutos padrão, 10 para grandes)
+            # Primeiro, tentar obter tamanho aproximado via oEmbed
+            timeout_list = 600  # 10 minutos para listar (pode ser playlist grande)
+            try:
+                oembed_url = f"https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/{playlist_id}"
+                response = requests.get(oembed_url, timeout=5)
+                if response.status_code == 200:
+                    # Se conseguir, usar timeout padrão menor
+                    timeout_list = 300
+            except:
+                pass
+            
             # Executar SpotDL
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_list)
             
             print(f"📊 SpotDL código: {result.returncode}")
             
@@ -883,47 +893,91 @@ def download_playlist_smart(playlist_url):
                 playlist_name_real = f"playlist_{playlist_id}"
             
             download_status['total_songs'] = len(songs)
-            download_status['progress'] = f'Encontradas {len(songs)} músicas em "{playlist_name_real}". Baixando com SpotDL...'
+            total_songs = len(songs)
+            
+            # Ajustar configurações baseado no tamanho da playlist
+            if total_songs > 100:
+                # Playlist grande: mais threads e timeout maior
+                spotdl_threads = '12'
+                timeout_seconds = 7200  # 2 horas para playlists grandes
+                download_status['progress'] = f'📊 Playlist GRANDE detectada ({total_songs} músicas). Otimizando para velocidade máxima...'
+                print(f"🚀 Modo otimizado para playlist grande: {total_songs} músicas")
+            elif total_songs > 50:
+                # Playlist média: threads médias
+                spotdl_threads = '10'
+                timeout_seconds = 3600  # 1 hora
+                download_status['progress'] = f'Encontradas {total_songs} músicas em "{playlist_name_real}". Baixando com SpotDL...'
+            else:
+                # Playlist pequena: configuração padrão
+                spotdl_threads = '8'
+                timeout_seconds = 1800  # 30 minutos
+                download_status['progress'] = f'Encontradas {total_songs} músicas em "{playlist_name_real}". Baixando com SpotDL...'
             
             print(f"📋 Playlist: {playlist_name_real}")
-            print(f"📋 Total de músicas: {len(songs)}")
+            print(f"📋 Total de músicas: {total_songs}")
+            print(f"⚙️ Configuração: {spotdl_threads} threads, timeout: {timeout_seconds}s")
             
-            # Tentar baixar com SpotDL diretamente
+            # Tentar baixar com SpotDL diretamente (otimizado para velocidade)
             cmd_download = [
                 'spotdl',
                 playlist_url,
                 '--output', output_dir,
                 '--format', 'mp3',
                 '--bitrate', '128k',
-                '--threads', '4'
+                '--threads', spotdl_threads,  # Threads ajustadas dinamicamente
+                '--print-errors'  # Para debug
+                # Removido --preload para ser mais rápido
             ]
             
             print(f"🔄 Executando SpotDL download: {' '.join(cmd_download)}")
-            download_status['progress'] = 'Baixando músicas com SpotDL (isso pode levar alguns minutos)...'
+            if total_songs > 100:
+                download_status['progress'] = f'Baixando {total_songs} músicas com SpotDL (playlist grande - pode levar 10-20 minutos)...'
+            else:
+                download_status['progress'] = 'Baixando músicas com SpotDL (isso pode levar alguns minutos)...'
             
-            result_dl = subprocess.run(cmd_download, capture_output=True, text=True, timeout=1800)
+            result_dl = subprocess.run(cmd_download, capture_output=True, text=True, timeout=timeout_seconds)
             
             if result_dl.returncode == 0:
-                print("✅ SpotDL baixou a playlist com sucesso!")
+                print("✅ SpotDL executou com sucesso!")
+                if result_dl.stdout:
+                    print(f"📝 SpotDL output: {result_dl.stdout[:300]}")
             else:
                 print(f"⚠️ SpotDL retornou código {result_dl.returncode}")
                 if result_dl.stderr:
                     print(f"Erro SpotDL: {result_dl.stderr[:500]}")
-                # Continuar para verificar se algum arquivo foi baixado
+                if result_dl.stdout:
+                    print(f"Output SpotDL: {result_dl.stdout[:300]}")
+                # Continuar para verificar se algum arquivo foi baixado mesmo assim
                 
         except Exception as e:
             print(f"⚠️ Erro no SpotDL direto: {e}")
-            # Continuar com método manual abaixo
+            import traceback
+            traceback.print_exc()
+            # Continuar para verificar se algum arquivo foi baixado
         
-        # Verificar arquivos baixados (tanto do SpotDL quanto do método manual)
+        # Verificar arquivos baixados (SpotDL pode salvar em subdiretórios)
         mp3_files = list(Path(output_dir).rglob('*.mp3'))
+        
+        # Se não encontrou, verificar também no diretório atual
+        if not mp3_files:
+            mp3_files = list(Path('downloads').rglob('*.mp3'))
+        
+        print(f"🔍 Arquivos MP3 encontrados: {len(mp3_files)}")
+        if mp3_files:
+            print(f"📁 Primeiro arquivo: {mp3_files[0]}")
         
         # Se SpotDL não baixou nada, usar método manual
         if not mp3_files:
-            print("🔄 SpotDL não baixou arquivos, usando método manual...")
-            download_status['progress'] = 'Baixando músicas manualmente...'
+            print("🔄 SpotDL não baixou arquivos, usando método manual paralelo...")
+            download_status['progress'] = 'Baixando músicas manualmente (paralelo)...'
             
-            playlist_name_real, songs = get_playlist_info_complete(playlist_url)
+            # Reutilizar lista de músicas já obtida (evitar executar SpotDL novamente)
+            if 'songs' not in locals() or not songs:
+                playlist_name_real, songs = get_playlist_info_complete(playlist_url)
+            else:
+                # Reutilizar nome da playlist já obtido
+                if 'playlist_name_real' not in locals():
+                    playlist_name_real = f"playlist_{playlist_id}"
             
             if not songs:
                 raise Exception('Não foi possível obter informações da playlist. Verifique se ela é pública.')
@@ -937,15 +991,53 @@ def download_playlist_smart(playlist_url):
             print(f"📋 Playlist: {playlist_name_real}")
             print(f"📋 Total de músicas: {len(songs)}")
             
-            successful_downloads = 0
+            # Downloads paralelos para acelerar (ajustado dinamicamente)
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             
-            for i, song in enumerate(songs):
-                download_status['current_song'] = song
-                download_status['progress'] = f'Baixando {i+1}/{len(songs)}: {song[:50]}...'
+            successful_downloads = 0
+            total_songs = len(songs)
+            
+            # Ajustar número de workers baseado no tamanho da playlist
+            if total_songs > 100:
+                max_workers = 10  # Mais workers para playlists grandes
+                print(f"🚀 Modo turbo ativado para playlist grande!")
+            elif total_songs > 50:
+                max_workers = 8   # Workers médios para playlists médias
+            else:
+                max_workers = 4   # Workers padrão para playlists pequenas
+            
+            def download_with_status(song, index):
+                """Download com atualização de status"""
+                try:
+                    download_status['current_song'] = f'{index+1}/{total_songs}: {song[:50]}...'
+                    if download_song_multi_source(song, output_dir):
+                        return True
+                    return False
+                except Exception as e:
+                    print(f"❌ Erro ao baixar {song}: {e}")
+                    return False
+            
+            # Executar downloads em paralelo (workers ajustados dinamicamente)
+            print(f"🚀 Iniciando downloads paralelos de {total_songs} músicas...")
+            download_status['progress'] = f'Baixando {total_songs} músicas em paralelo ({max_workers} simultâneos - mais rápido!)...'
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submeter todos os downloads
+                future_to_song = {
+                    executor.submit(download_with_status, song, i): (song, i) 
+                    for i, song in enumerate(songs)
+                }
                 
-                if download_song_multi_source(song, output_dir):
-                    successful_downloads += 1
-                    download_status['downloaded_songs'] = successful_downloads
+                # Processar conforme completam
+                for future in as_completed(future_to_song):
+                    song, index = future_to_song[future]
+                    try:
+                        if future.result():
+                            successful_downloads += 1
+                            download_status['downloaded_songs'] = successful_downloads
+                            print(f"✅ [{successful_downloads}/{total_songs}] {song}")
+                    except Exception as e:
+                        print(f"❌ Erro no download de {song}: {e}")
             
             # Verificar novamente após downloads manuais
             mp3_files = list(Path(output_dir).rglob('*.mp3'))
