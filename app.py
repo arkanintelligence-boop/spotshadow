@@ -28,6 +28,34 @@ download_status = {
     'total_songs': 0
 }
 
+def get_playlist_name_from_url(playlist_url):
+    """Obter nome da playlist do Spotify"""
+    try:
+        playlist_id = playlist_url.split('/')[-1].split('?')[0]
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        # Tentar obter nome da página normal do Spotify
+        response = requests.get(playlist_url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            # Buscar título na página
+            title_match = re.search(r'<title>([^<]+)</title>', response.text)
+            if title_match:
+                title = title_match.group(1)
+                # Limpar o título (remover " - playlist by..." etc)
+                clean_title = title.split(' - ')[0].split(' | ')[0].strip()
+                if clean_title and clean_title != 'Spotify':
+                    return clean_title
+        
+        return None
+        
+    except Exception as e:
+        print(f"❌ Erro ao obter nome da playlist: {e}")
+        return None
+
 def get_playlist_info_public(playlist_url):
     """Obter informações da playlist sem API (web scraping público)"""
     try:
@@ -250,16 +278,22 @@ def download_playlist_smart(playlist_url):
             shutil.rmtree(output_dir)
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        # Obter lista de músicas
+        # Obter lista de músicas e nome da playlist
         download_status['progress'] = 'Analisando playlist do Spotify...'
         songs = get_playlist_info_public(playlist_url)
         
         if not songs:
             raise Exception('Não foi possível obter informações da playlist. Verifique se ela é pública.')
         
-        download_status['total_songs'] = len(songs)
-        download_status['progress'] = f'Encontradas {len(songs)} músicas. Iniciando downloads...'
+        # Tentar obter o nome real da playlist
+        playlist_name_real = get_playlist_name_from_url(playlist_url)
+        if not playlist_name_real:
+            playlist_name_real = f"playlist_{playlist_id}"
         
+        download_status['total_songs'] = len(songs)
+        download_status['progress'] = f'Encontradas {len(songs)} músicas em "{playlist_name_real}". Iniciando downloads...'
+        
+        print(f"📋 Playlist: {playlist_name_real}")
         print(f"📋 Músicas encontradas: {songs}")
         
         successful_downloads = 0
@@ -279,8 +313,9 @@ def download_playlist_smart(playlist_url):
             download_status['progress'] = f'Criando ZIP com {len(mp3_files)} músicas...'
             download_status['current_song'] = 'Finalizando...'
             
-            # Criar ZIP
-            zip_name = f"downloads/{playlist_name}.zip"
+            # Criar ZIP com nome da playlist
+            safe_name = "".join(c for c in playlist_name_real if c.isalnum() or c in (' ', '-', '_')).rstrip()
+            zip_name = f"downloads/{safe_name}.zip"
             with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for file_path in mp3_files:
                     # Nome mais limpo
