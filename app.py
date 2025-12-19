@@ -18,7 +18,15 @@ from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
-# Versão simplificada - sem credenciais do Spotify
+# Configurações do Spotify (opcionais - podem ser definidas via variáveis de ambiente)
+SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID', '')
+SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET', '')
+
+# Token do Spotify (cache)
+spotify_token = {
+    'access_token': None,
+    'expires_at': 0
+}
 
 # Status global do download
 download_status = {
@@ -37,6 +45,11 @@ def get_spotify_access_token():
     
     try:
         import time
+        
+        # Verificar se as credenciais estão configuradas
+        if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+            print("⚠️ Credenciais do Spotify não configuradas. Use variáveis de ambiente SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET")
+            return None
         
         # Verificar se o token ainda é válido
         if spotify_token['access_token'] and time.time() < spotify_token['expires_at']:
@@ -174,8 +187,10 @@ def get_all_songs_spotdl_enhanced(playlist_url):
         playlist_id = playlist_url.split('/')[-1].split('?')[0]
         print(f"🔄 Usando SpotDL aprimorado para extrair TODAS as músicas...")
         
-        # Comando SpotDL mais robusto
-        temp_file = f'/tmp/playlist_{playlist_id}.spotdl'
+        # Comando SpotDL mais robusto - usar caminho compatível com Windows
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, f'playlist_{playlist_id}.spotdl')
         
         list_cmd = [
             'spotdl',
@@ -559,7 +574,7 @@ def extract_playlist_name(data):
     return search_name(data)
 
 def get_playlist_info_complete(playlist_url):
-    """SOLUÇÃO SIMPLES: Usar apenas SpotDL que já funciona"""
+    """Obter informações completas da playlist usando múltiplos métodos"""
     try:
         playlist_id = playlist_url.split('/')[-1].split('?')[0]
         print(f"🔍 Playlist ID: {playlist_id}")
@@ -573,13 +588,24 @@ def get_playlist_info_complete(playlist_url):
                 data = response.json()
                 playlist_name = data.get('title', 'Playlist')
                 print(f"✅ Nome da playlist: {playlist_name}")
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ Erro ao obter nome via oEmbed: {e}")
         
-        # USAR APENAS SPOTDL - MÉTODO QUE JÁ FUNCIONA
+        # MÉTODO 1: Tentar API oficial do Spotify (se credenciais disponíveis)
+        if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
+            print("🔍 Tentando API oficial do Spotify...")
+            playlist_name_api, songs_api = get_spotify_playlist_official(playlist_id)
+            if songs_api:
+                print(f"✅ API oficial extraiu {len(songs_api)} músicas!")
+                return playlist_name_api or playlist_name, songs_api
+        
+        # MÉTODO 2: Usar SpotDL (método principal)
         print("🎵 Usando SpotDL para extrair TODAS as músicas...")
         
-        temp_file = f'/tmp/playlist_{playlist_id}.spotdl'
+        # Usar caminho compatível com Windows
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, f'playlist_{playlist_id}.spotdl')
         
         # Comando SpotDL simples e direto
         cmd = [
@@ -632,45 +658,67 @@ def get_playlist_info_complete(playlist_url):
                     print("❌ Arquivo SpotDL não é JSON válido")
             
         except subprocess.TimeoutExpired:
-            print("⏰ SpotDL timeout")
+            print("⏰ SpotDL timeout após 5 minutos")
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
         except Exception as e:
             print(f"❌ Erro SpotDL: {e}")
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
         
-        # Se SpotDL falhou, usar lista baseada no nome
-        print(f"⚠️ SpotDL falhou, gerando lista baseada em: {playlist_name}")
+        # Tentar método alternativo: usar spotdl para listar músicas sem salvar arquivo
+        print("🔄 Tentando método alternativo do SpotDL...")
+        try:
+            cmd_list = [
+                'spotdl',
+                playlist_url,
+                '--list',
+                '--preload'
+            ]
+            
+            result_list = subprocess.run(cmd_list, capture_output=True, text=True, timeout=300)
+            
+            if result_list.returncode == 0 and result_list.stdout:
+                # Parsear saída do spotdl --list
+                lines = result_list.stdout.strip().split('\n')
+                songs = []
+                
+                for line in lines:
+                    line = line.strip()
+                    if line and ' - ' in line:
+                        # Formato esperado: "Artista - Nome da Música"
+                        songs.append(line)
+                
+                if songs:
+                    print(f"✅ SpotDL (--list) extraiu {len(songs)} músicas!")
+                    return playlist_name, songs
+            else:
+                print(f"⚠️ SpotDL --list retornou código {result_list.returncode}")
+                if result_list.stderr:
+                    print(f"Erro: {result_list.stderr[:200]}")
+        except Exception as e:
+            print(f"❌ Erro no método alternativo: {e}")
         
-        # Lista simples baseada no nome
-        if 'leandro' in playlist_name.lower() and 'leonardo' in playlist_name.lower():
-            songs = [
-                "Leandro & Leonardo - Contradições",
-                "Leandro & Leonardo - Pense em Mim",
-                "Leandro & Leonardo - Temporal de Amor",
-                "Leandro & Leonardo - Entre Tapas e Beijos",
-                "Leandro & Leonardo - Cumade e Cumpade"
-            ]
-        elif any(word in playlist_name.lower() for word in ['club', 'house', 'techno', 'eletronic']):
-            songs = [
-                "David Guetta - Titanium",
-                "Calvin Harris - Feel So Close",
-                "Avicii - Wake Me Up",
-                "Martin Garrix - Animals",
-                "Tiësto - Adagio for Strings"
-            ]
-        else:
-            songs = [
-                f"Artista 1 - Música da {playlist_name}",
-                f"Artista 2 - Hit da {playlist_name}",
-                f"Artista 3 - Som da {playlist_name}",
-                f"Artista 4 - Sucesso da {playlist_name}",
-                f"Artista 5 - Top da {playlist_name}"
-            ]
+        # Se todos os métodos falharam, retornar erro
+        print(f"❌ Não foi possível extrair músicas da playlist '{playlist_name}'")
+        print("💡 Verifique se:")
+        print("   1. A playlist é pública no Spotify")
+        print("   2. O SpotDL está instalado corretamente (pip install spotdl)")
+        print("   3. A URL da playlist está correta")
         
-        print(f"✅ Geradas {len(songs)} músicas para '{playlist_name}'")
-        return playlist_name, songs
+        return playlist_name, []
         
     except Exception as e:
-        print(f"❌ Erro geral: {e}")
-        return "Playlist", ["Artista - Música 1", "Artista - Música 2", "Artista - Música 3"]
+        print(f"❌ Erro geral ao obter informações da playlist: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Playlist", []
 
 def download_song_multi_source(song_title, output_dir):
     """Baixar música usando múltiplas fontes"""
@@ -819,34 +867,92 @@ def download_playlist_smart(playlist_url):
         # Obter lista de músicas e nome da playlist
         download_status['progress'] = 'Analisando playlist do Spotify...'
         
-        # Obter TODAS as músicas usando API oficial + fallbacks
-        playlist_name_real, songs = get_playlist_info_complete(playlist_url)
+        # MÉTODO 1: Tentar usar SpotDL diretamente para baixar (mais eficiente)
+        print("🎵 Tentando baixar diretamente com SpotDL...")
+        download_status['progress'] = 'Baixando playlist com SpotDL...'
         
-        if not songs:
-            raise Exception('Não foi possível obter informações da playlist. Verifique se ela é pública.')
-        
-        # Garantir que temos um nome para a playlist
-        if not playlist_name_real:
-            playlist_name_real = f"playlist_{playlist_id}"
-        
-        download_status['total_songs'] = len(songs)
-        download_status['progress'] = f'Encontradas {len(songs)} músicas em "{playlist_name_real}". Iniciando downloads...'
-        
-        print(f"📋 Playlist: {playlist_name_real}")
-        print(f"📋 Músicas encontradas: {songs}")
-        
-        successful_downloads = 0
-        
-        for i, song in enumerate(songs):
-            download_status['current_song'] = song
-            download_status['progress'] = f'Baixando {i+1}/{len(songs)}: {song[:50]}...'
+        try:
+            # Primeiro, obter lista de músicas para mostrar progresso
+            playlist_name_real, songs = get_playlist_info_complete(playlist_url)
             
-            if download_song_multi_source(song, output_dir):
-                successful_downloads += 1
-                download_status['downloaded_songs'] = successful_downloads
+            if not songs:
+                raise Exception('Não foi possível obter informações da playlist. Verifique se ela é pública e se o SpotDL está instalado corretamente.')
+            
+            # Garantir que temos um nome para a playlist
+            if not playlist_name_real:
+                playlist_name_real = f"playlist_{playlist_id}"
+            
+            download_status['total_songs'] = len(songs)
+            download_status['progress'] = f'Encontradas {len(songs)} músicas em "{playlist_name_real}". Baixando com SpotDL...'
+            
+            print(f"📋 Playlist: {playlist_name_real}")
+            print(f"📋 Total de músicas: {len(songs)}")
+            
+            # Tentar baixar com SpotDL diretamente
+            cmd_download = [
+                'spotdl',
+                playlist_url,
+                '--output', output_dir,
+                '--format', 'mp3',
+                '--bitrate', '128k',
+                '--threads', '4'
+            ]
+            
+            print(f"🔄 Executando SpotDL download: {' '.join(cmd_download)}")
+            download_status['progress'] = 'Baixando músicas com SpotDL (isso pode levar alguns minutos)...'
+            
+            result_dl = subprocess.run(cmd_download, capture_output=True, text=True, timeout=1800)
+            
+            if result_dl.returncode == 0:
+                print("✅ SpotDL baixou a playlist com sucesso!")
+            else:
+                print(f"⚠️ SpotDL retornou código {result_dl.returncode}")
+                if result_dl.stderr:
+                    print(f"Erro SpotDL: {result_dl.stderr[:500]}")
+                # Continuar para verificar se algum arquivo foi baixado
+                
+        except Exception as e:
+            print(f"⚠️ Erro no SpotDL direto: {e}")
+            # Continuar com método manual abaixo
         
-        # Verificar arquivos baixados
+        # Verificar arquivos baixados (tanto do SpotDL quanto do método manual)
         mp3_files = list(Path(output_dir).rglob('*.mp3'))
+        
+        # Se SpotDL não baixou nada, usar método manual
+        if not mp3_files:
+            print("🔄 SpotDL não baixou arquivos, usando método manual...")
+            download_status['progress'] = 'Baixando músicas manualmente...'
+            
+            playlist_name_real, songs = get_playlist_info_complete(playlist_url)
+            
+            if not songs:
+                raise Exception('Não foi possível obter informações da playlist. Verifique se ela é pública.')
+            
+            if not playlist_name_real:
+                playlist_name_real = f"playlist_{playlist_id}"
+            
+            download_status['total_songs'] = len(songs)
+            download_status['progress'] = f'Encontradas {len(songs)} músicas em "{playlist_name_real}". Baixando manualmente...'
+            
+            print(f"📋 Playlist: {playlist_name_real}")
+            print(f"📋 Total de músicas: {len(songs)}")
+            
+            successful_downloads = 0
+            
+            for i, song in enumerate(songs):
+                download_status['current_song'] = song
+                download_status['progress'] = f'Baixando {i+1}/{len(songs)}: {song[:50]}...'
+                
+                if download_song_multi_source(song, output_dir):
+                    successful_downloads += 1
+                    download_status['downloaded_songs'] = successful_downloads
+            
+            # Verificar novamente após downloads manuais
+            mp3_files = list(Path(output_dir).rglob('*.mp3'))
+        
+        # Verificar arquivos baixados (se ainda não foi verificado)
+        if 'mp3_files' not in locals():
+            mp3_files = list(Path(output_dir).rglob('*.mp3'))
         
         if mp3_files:
             download_status['progress'] = f'Criando ZIP com {len(mp3_files)} músicas...'
