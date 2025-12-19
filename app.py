@@ -118,9 +118,13 @@ def install_spotdl():
     try:
         result = subprocess.run(['spotdl', '--version'], check=True, capture_output=True, text=True, timeout=10)
         print(f"✅ SpotDL encontrado: {result.stdout.strip()}")
+        
+        # Verificar FFmpeg também
+        ffmpeg_result = subprocess.run(['ffmpeg', '-version'], check=True, capture_output=True, text=True, timeout=10)
+        print(f"✅ FFmpeg encontrado")
         return True
     except Exception as e:
-        print(f"❌ SpotDL não disponível: {e}")
+        print(f"❌ SpotDL ou FFmpeg não disponível: {e}")
         return False
 
 def get_playlist_name(playlist_url):

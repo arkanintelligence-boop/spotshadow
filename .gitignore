@@ -9,8 +9,7 @@
 !requirements.txt
 !runtime.txt
 !Procfile
-!start.sh
-!install_ffmpeg.sh
+!nixpacks.toml
 !README.md
 !.gitignore
 !Dockerfile
