@@ -77,15 +77,36 @@ def download_playlist_async(playlist_url):
         version_result = subprocess.run(version_cmd, capture_output=True, text=True, timeout=10)
         print(f"SpotDL version: {version_result.stdout.strip()}")
         
-        # Comando mais básico para evitar rate limiting
+        # Estratégia alternativa: usar yt-dlp diretamente
+        print("🔄 Tentando abordagem alternativa com yt-dlp...")
+        
+        # Primeiro, obter URLs das músicas do Spotify
+        info_cmd = [
+            'spotdl', 
+            playlist_url,
+            '--save-file', f'{output_dir}/playlist.spotdl',
+            '--preload'  # Só obter informações, não baixar
+        ]
+        
+        print(f"📋 Obtendo informações da playlist: {' '.join(info_cmd)}")
+        
+        try:
+            info_process = subprocess.run(info_cmd, capture_output=True, text=True, timeout=60)
+            print(f"Info process return code: {info_process.returncode}")
+            if info_process.stdout:
+                print(f"Info stdout: {info_process.stdout}")
+        except Exception as e:
+            print(f"Erro ao obter informações: {e}")
+        
+        # Comando SpotDL normal como fallback
         cmd = [
             'spotdl', 
             playlist_url, 
             '--output', output_dir,
             '--threads', '1',
             '--format', 'mp3',
-            '--bitrate', '128k',
-            '--max-retries', '10'  # Mais tentativas automáticas
+            '--bitrate', '96k',  # Bitrate ainda menor
+            '--audio', 'soundcloud'  # Tentar SoundCloud primeiro
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
