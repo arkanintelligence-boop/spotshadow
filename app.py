@@ -116,13 +116,23 @@ def add_file_to_cleanup(file_path):
 def install_spotdl():
     """Instala o spotDL se não estiver instalado"""
     try:
-        subprocess.run(['spotdl', '--version'], check=True, capture_output=True)
+        result = subprocess.run(['spotdl', '--version'], check=True, capture_output=True, text=True)
+        print(f"✅ SpotDL encontrado: {result.stdout.strip()}")
         return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"⚠️ SpotDL não encontrado: {e}")
         try:
-            subprocess.run([sys.executable, '-m', 'pip', 'install', 'spotdl'], check=True)
+            print("🔄 Instalando SpotDL...")
+            result = subprocess.run([sys.executable, '-m', 'pip', 'install', 'spotdl==4.2.5'], 
+                                  check=True, capture_output=True, text=True)
+            print(f"✅ SpotDL instalado: {result.stdout}")
+            
+            # Verificar se instalou corretamente
+            result = subprocess.run(['spotdl', '--version'], check=True, capture_output=True, text=True)
+            print(f"✅ SpotDL verificado: {result.stdout.strip()}")
             return True
-        except:
+        except Exception as install_error:
+            print(f"❌ Erro ao instalar SpotDL: {install_error}")
             return False
 
 def get_playlist_name(playlist_url):
@@ -184,19 +194,28 @@ def download_playlist_async(playlist_url):
         # Verificar se a playlist é acessível tentando salvar metadados
         download_status['progress'] = 'Verificando playlist...'
         
-        # Comando spotDL simplificado
+        # Comando spotDL com configurações otimizadas
         cmd = [
             'spotdl',
             'download',
             playlist_url,
             '--output', output_dir,
             '--format', 'mp3',
-            '--bitrate', '320k'
+            '--bitrate', '320k',
+            '--threads', '4'
         ]
+        
+        print(f"🎵 Executando comando: {' '.join(cmd)}")
         
         # Executar download com timeout maior
         download_status['progress'] = 'Baixando músicas... (isso pode demorar alguns minutos)'
         process = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # 10 minutos timeout
+        
+        print(f"📊 SpotDL retornou código: {process.returncode}")
+        if process.stdout:
+            print(f"📝 SpotDL stdout: {process.stdout[:500]}...")
+        if process.stderr:
+            print(f"⚠️ SpotDL stderr: {process.stderr[:500]}...")
         
         # Verificar se houve erro
         if process.returncode != 0:
@@ -439,8 +458,11 @@ def download():
         return jsonify({'error': 'Já existe um download em andamento'}), 400
     
     # Verificar spotDL
+    print("🔍 Verificando SpotDL...")
     if not install_spotdl():
-        return jsonify({'error': 'Erro ao instalar spotDL'}), 500
+        print("❌ Falha ao verificar/instalar SpotDL")
+        return jsonify({'error': 'SpotDL não disponível. Tente novamente em alguns minutos.'}), 500
+    print("✅ SpotDL verificado com sucesso")
     
     # Resetar status
     download_status = {
