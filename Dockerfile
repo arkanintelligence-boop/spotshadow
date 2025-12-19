@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
@@ -14,16 +14,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Instalar gunicorn para produção
+RUN pip install gunicorn
+
 # Copiar todo o código da aplicação
 COPY . .
 
 # Criar pastas necessárias
-RUN mkdir -p downloads
-
-# Verificar se arquivos essenciais existem
-RUN ls -la templates/ || echo "Templates directory missing"
-RUN ls -la favicon.png || echo "Favicon missing"
-RUN ls -la logotipo-semfundo.png || echo "Logo missing"
+RUN mkdir -p downloads templates
 
 # Definir variáveis de ambiente
 ENV PYTHONUNBUFFERED=1
@@ -33,9 +31,5 @@ ENV HOST=0.0.0.0
 # Expor porta
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
-
-# Comando de inicialização mais robusto
-CMD ["python", "-u", "app.py"]
+# Comando de inicialização com gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "300", "app:app"]
