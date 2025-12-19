@@ -54,12 +54,22 @@ def download_playlist_async(playlist_url):
         
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
+        # Testar se conseguimos escrever no diretório
+        test_file = Path(output_dir) / "test_write.txt"
+        try:
+            test_file.write_text("teste de escrita")
+            test_file.unlink()  # Deletar arquivo de teste
+            print(f"✅ Permissão de escrita OK em {output_dir}")
+        except Exception as e:
+            print(f"❌ Erro de permissão em {output_dir}: {e}")
+            raise Exception(f'Erro de permissão no diretório: {e}')
+        
         download_status['progress'] = 'Conectando ao Spotify...'
         
         # Aguardar mais tempo para evitar rate limit
         import time
-        print("⏳ Aguardando 10 segundos para evitar rate limiting...")
-        time.sleep(10)
+        print("⏳ Aguardando 30 segundos para evitar rate limiting...")
+        time.sleep(30)  # Aguardar mais tempo
         
         # Testar conectividade primeiro
         print("🔍 Testando SpotDL...")
@@ -67,15 +77,15 @@ def download_playlist_async(playlist_url):
         version_result = subprocess.run(version_cmd, capture_output=True, text=True, timeout=10)
         print(f"SpotDL version: {version_result.stdout.strip()}")
         
-        # Comando com configurações para contornar rate limiting
+        # Comando mais básico para evitar rate limiting
         cmd = [
             'spotdl', 
             playlist_url, 
             '--output', output_dir,
             '--threads', '1',
-            '--audio', 'youtube-music',  # Usar YouTube Music em vez do YouTube normal
-            '--bitrate', '128k',  # Bitrate menor para ser mais rápido
-            '--format', 'mp3'
+            '--format', 'mp3',
+            '--bitrate', '128k',
+            '--max-retries', '10'  # Mais tentativas automáticas
         ]
         
         print(f"🎵 Executando comando: {' '.join(cmd)}")
